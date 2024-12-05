@@ -47,6 +47,20 @@ struct udp_hdr_t {
     uint16_t checksum;
 };
 
+struct PillarStreamHeader {
+    uint16_t packetSize;
+    uint8_t deliveryFlag;
+    uint8_t numberOfMessages;
+    uint32_t sequenceNumber;
+    uint64_t sendTime;
+};
+
+// Pillar Message Header
+struct PillarMessageHeader {
+    uint16_t messageSize;
+    uint16_t messageType;
+};
+
 // Define message types
 constexpr uint16_t MSG_TYPE_ADD_ORDER = 100;
 constexpr uint16_t MSG_TYPE_MODIFY_ORDER = 101;
@@ -58,14 +72,8 @@ constexpr uint16_t MSG_TYPE_CROSS_TRADE = 111;
 constexpr uint16_t MSG_TYPE_TRADE_CANCEL = 112;
 constexpr uint16_t MSG_TYPE_CROSS_CORRECTION = 113;
 
-// Base Message Header (common fields)
-struct MessageHeader {
-    uint16_t msgSize;
-    uint16_t msgType;
-};
-
 // Add Order Message (Msg Type 100)
-struct AddOrderMessage : MessageHeader {
+struct AddOrderMessage : PillarMessageHeader {
     uint64_t orderID;
     uint32_t price;
     uint32_t volume;
@@ -73,19 +81,19 @@ struct AddOrderMessage : MessageHeader {
 };
 
 // Modify Order Message (Msg Type 101)
-struct ModifyOrderMessage : MessageHeader {
+struct ModifyOrderMessage : PillarMessageHeader {
     uint64_t orderID;
     uint32_t price;
     uint32_t volume;
 };
 
 // Delete Order Message (Msg Type 102)
-struct DeleteOrderMessage : MessageHeader {
+struct DeleteOrderMessage : PillarMessageHeader {
     uint64_t orderID;
 };
 
 // Replace Order Message (Msg Type 104)
-struct ReplaceOrderMessage : MessageHeader {
+struct ReplaceOrderMessage : PillarMessageHeader {
     uint64_t oldOrderID;
     uint64_t newOrderID;
     uint32_t price;
@@ -93,7 +101,7 @@ struct ReplaceOrderMessage : MessageHeader {
 };
 
 // Order Execution Message (Msg Type 103)
-struct OrderExecutionMessage : MessageHeader {
+struct OrderExecutionMessage : PillarMessageHeader {
     uint64_t orderID;
     uint64_t tradeID;
     uint32_t price;
@@ -170,15 +178,15 @@ void printHex(const u_char* data, size_t length) {
 
 // Dispatcher function
 void handleMessage(const uint8_t* buffer, size_t size) {
-    if (size < sizeof(MessageHeader)) {
+    if (size < sizeof(PillarMessageHeader)) {
         std::cerr << "Invalid message size.\n";
         return;
     }
 
-    MessageHeader header;
+    PillarMessageHeader header;
     std::memcpy(&header, buffer, sizeof(header));
 
-    switch (header.msgType) {
+    switch (header.messageType) {
         case MSG_TYPE_ADD_ORDER: {
             if (size < sizeof(AddOrderMessage)) {
                 std::cerr << "Invalid Add Order Message size.\n";
@@ -236,44 +244,98 @@ void handleMessage(const uint8_t* buffer, size_t size) {
             break;
         }
         default:
-            std::cerr << "Unknown message type: " << header.msgType << "\n";
+            std::cerr << "Unknown message type: " << header.messageType << "\n";
             break;
     }
 }
 
-// XDP Parsing Function
-void parseXDPMessage(const u_char* data, uint16_t length) {
-    const u_char* message_ptr = data;
-    uint16_t bytes_processed = 0;
+// Parse Pillar Messages
+void parsePillarMessages(const uint8_t* data, uint16_t length) {
+    const uint8_t* messagePtr = data;
+    uint16_t bytesProcessed = 0;
 
-    while (bytes_processed < length) {
-        if ((bytes_processed + sizeof(MessageHeader)) > length) {
-            std::cerr << "[Error] Insufficient data for XDP Message Header\n";
+    while (bytesProcessed < length) {
+        if ((bytesProcessed + sizeof(PillarMessageHeader)) > length) {
+            std::cerr << "[Error] Insufficient data for Pillar Message Header\n";
             break;
         }
 
-        MessageHeader header;
-        std::memcpy(&header, message_ptr, sizeof(header));
-        uint16_t msg_size = header.msgSize;
+        // Read Pillar Message Header
+        PillarMessageHeader msgHeader;
+        std::memcpy(&msgHeader, messagePtr, sizeof(msgHeader));
 
-        if (msg_size < sizeof(MessageHeader)) {
-            std::cerr << "[Error] Message size too small.\n";
+        uint16_t messageSize = msgHeader.messageSize;
+        if (messageSize < sizeof(PillarMessageHeader) || (bytesProcessed + messageSize) > length) {
+            std::cerr << "[Error] Invalid Pillar Message size: " << messageSize << "\n";
             break;
         }
 
-        if ((bytes_processed + msg_size) > length) {
-            std::cerr << "[Error] Message size exceeds remaining data.\n";
-            break;
-        }
+        std::cout << "[Pillar Message] Type: " << msgHeader.messageType
+                  << ", Size: " << msgHeader.messageSize << "\n";
 
-        std::cout << "[XDP Message] Type: " << header.msgType << ", Size: " << header.msgSize << "\n";
-
-        // Pass the message to the dispatcher
-        handleMessage(message_ptr, msg_size);
+        // Pass the message to the handler
+        handleMessage(messagePtr, messageSize);
 
         // Move to the next message
-        bytes_processed += msg_size;
-        message_ptr += msg_size;
+        bytesProcessed += messageSize;
+        messagePtr += messageSize;
+    }
+}
+
+void parsePillarStream(const uint8_t* data, uint16_t length) {
+    if (length < 16) {
+        std::cerr << "[Error] Insufficient data for Packet Header\n";
+        return;
+    }
+
+    // Parse Packet Header
+    uint16_t pktSize = *(reinterpret_cast<const uint16_t*>(data));
+    uint8_t numberOfMessages = *(data + 3);
+    uint32_t sequenceNumber = *(reinterpret_cast<const uint32_t*>(data + 4));
+    uint64_t sendTime = *(reinterpret_cast<const uint64_t*>(data + 8));
+
+    std::cout << "[Packet Header] Packet Size: " << pktSize
+              << ", Number of Messages: " << static_cast<int>(numberOfMessages)
+              << ", Sequence Number: " << sequenceNumber
+              << ", Send Time: " << sendTime << "\n";
+
+    // Validate packet size
+    if (pktSize != length) {
+        std::cerr << "[Error] Packet size mismatch. Expected: " << pktSize
+                  << ", Actual: " << length << "\n";
+        return;
+    }
+
+    // Start parsing messages
+    const uint8_t* messagePtr = data + 16; // Skip 16-byte Packet Header
+    uint16_t bytesProcessed = 16;
+
+    for (uint8_t i = 0; i < numberOfMessages; ++i) {
+        if ((bytesProcessed + 4) > length) {
+            std::cerr << "[Error] Insufficient data for Message Header\n";
+            break;
+        }
+
+        // Parse Message Header
+        uint16_t msgSize = *(reinterpret_cast<const uint16_t*>(messagePtr));
+        uint16_t msgType = *(reinterpret_cast<const uint16_t*>(messagePtr + 2));
+
+        std::cout << "[Message Header] Message Type: " << msgType
+                  << ", Message Size: " << msgSize << "\n";
+
+        if (msgSize < 4 || (bytesProcessed + msgSize) > length) {
+            std::cerr << "[Error] Invalid Message Size: " << msgSize << "\n";
+            break;
+        }
+
+        // Pass message data for further processing
+        const uint8_t* msgData = messagePtr + 4;
+        uint16_t msgLength = msgSize - 4;
+        parsePillarMessages(msgData, msgLength);
+
+        // Advance to the next message
+        bytesProcessed += msgSize;
+        messagePtr += msgSize;
     }
 }
 
@@ -338,11 +400,23 @@ int main(int argc, char* argv[]) {
             std::cerr << "Error parsing UDP header" << std::endl;
             continue;
         }
+        
+        // Extract UDP Payload
+        uint16_t ipHeaderLength = (*(packet_data + 14) & 0x0F) * 4; // IHL field (IPv4 header length)
+        uint16_t udpHeaderOffset = 14 + ipHeaderLength;
+        uint16_t udpPayloadOffset = udpHeaderOffset + 8; // 8 bytes UDP header
+        uint16_t udpPayloadLength = ntohs(*(reinterpret_cast<const uint16_t*>(packet_data + udpHeaderOffset + 4))) - 8;
 
-        // Extract and parse XDP data
-        const u_char* xdp_data = packet_data + sizeof(mac_hdr_t) + ipv4_header_length + sizeof(udp_hdr_t);
-        uint16_t xdp_length = udp_header.length - sizeof(udp_hdr_t);
-        parseXDPMessage(xdp_data, xdp_length);
+        if (udpPayloadOffset + udpPayloadLength > packet_header->len) {
+            std::cerr << "[Error] UDP payload exceeds packet length\n";
+            continue;
+        }
+
+        // Extract and parse Pillar stream
+        const uint8_t* pillarData = packet_data + udpPayloadOffset;
+        uint16_t pillarLength = udpPayloadLength;
+        parsePillarStream(pillarData, pillarLength);
+
     }
 
     pcap_close(handle);
