@@ -73,125 +73,230 @@ constexpr uint16_t MSG_TYPE_DELETE_ORDER = 102;
 constexpr uint16_t MSG_TYPE_ORDER_EXECUTION = 103;
 constexpr uint16_t MSG_TYPE_REPLACE_ORDER = 104;
 constexpr uint16_t MSG_TYPE_IMBALANCE = 105;
+constexpr uint16_t MSG_TYPE_ADD_ORDER_REFRESH = 106;
 constexpr uint16_t MSG_TYPE_NON_DISPLAYED_TRADE = 110;
 constexpr uint16_t MSG_TYPE_CROSS_TRADE = 111;
 constexpr uint16_t MSG_TYPE_TRADE_CANCEL = 112;
 constexpr uint16_t MSG_TYPE_CROSS_CORRECTION = 113;
+constexpr uint16_t MSG_TYPE_RETAIL_PRICE_IMPROVEMENT = 114;
 
 // Sequence Number Reset Message (Msg Type 1)
 struct SequenceNumberResetMessage : PillarMessageHeader {
     uint64_t sourceTime;
+    uint32_t sourceTimeNS;
     uint16_t productID;
     uint16_t channelID;
 };
 
 // Source Time Reference Message (Msg Type 2)
 struct SourceTimeReferenceMessage : PillarMessageHeader {
-    uint64_t sourceTime;
-    uint32_t sourceTimeNS;
     uint16_t id;
+    uint32_t symbolSeqNum;
+    uint64_t sourceTime;
 };
 
-// Symbol Index Mapping Message (Type 3)
+// Symbol Index Mapping Message (Msg Type 3)
 struct SymbolIndexMappingMessage : PillarMessageHeader {
-    uint16_t symbolIndex;
+    uint32_t symbolIndex;
     char symbol[11];
+    uint8_t reserved1;
     uint16_t marketID;
+    uint8_t systemID;
+    char exchangeCode;
     uint8_t priceScaleCode;
     uint8_t securityType;
+    uint16_t lotSize;
+    uint32_t prevClosePrice;
+    uint32_t prevCloseVolume;
+    uint8_t priceResolution;
+    char roundLot;
+    uint16_t mpv;
+    uint16_t unitOfTrade;
+    uint16_t reserved2;
 };
 
-// Symbol Clear Message (Type 32)
+// Symbol Clear Message (Msg Type 32)
 struct SymbolClearMessage : PillarMessageHeader {
-    uint16_t symbolIndex;
-    uint32_t nextSourceSeqNum;
     uint64_t sourceTime;
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t nextSourceSeqNum;
 };
 
 // Security Status Message (Msg Type 34)
 struct SecurityStatusMessage : PillarMessageHeader {
-    uint16_t symbolIndex;
-    uint8_t securityStatus;
-    uint8_t haltCondition;
+    uint32_t sourceTime;
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t symbolSeqNum;
+    char securityStatus;
+    char haltCondition;
+    uint32_t reserved;
+    uint32_t price1;
+    uint32_t price2;
+    char ssrTriggeringExchangeID;
+    uint32_t ssrTriggeringVolume;
+    uint32_t time;
+    char ssrState;                
+    char marketState;
+    char sessionState;
 };
 
 // Add Order Message (Msg Type 100)
 struct AddOrderMessage : PillarMessageHeader {
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t symbolSeqNum;
     uint64_t orderID;
     uint32_t price;
     uint32_t volume;
-    char side; // 'B' for Buy, 'S' for Sell
+    char side;
+    char firmID[5];
+    uint8_t reserved1;
 };
 
 // Modify Order Message (Msg Type 101)
 struct ModifyOrderMessage : PillarMessageHeader {
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t symbolSeqNum;
     uint64_t orderID;
     uint32_t price;
     uint32_t volume;
+    uint8_t positionChange;
+    char side;
+    uint8_t reserved2;
 };
 
 // Delete Order Message (Msg Type 102)
 struct DeleteOrderMessage : PillarMessageHeader {
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t symbolSeqNum;
     uint64_t orderID;
+    uint8_t reserved1;
 };
 
 // Order Execution Message (Msg Type 103)
 struct OrderExecutionMessage : PillarMessageHeader {
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t symbolSeqNum;
     uint64_t orderID;
     uint64_t tradeID;
     uint32_t price;
     uint32_t volume;
+    uint8_t printableFlag;
+    uint8_t reserved1;
+    char tradeCond1;
+    char tradeCond2;
+    char tradeCond3;
+    char tradeCond4;
 };
 
 // Replace Order Message (Msg Type 104)
 struct ReplaceOrderMessage : PillarMessageHeader {
-    uint64_t oldOrderID;
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t symbolSeqNum;
+    uint64_t orderID;
     uint64_t newOrderID;
     uint32_t price;
     uint32_t volume;
+    char side;
+    uint8_t reserved2;
 };
 
 // Imbalance Message (Msg Type 105)
 struct ImbalanceMessage : PillarMessageHeader {
+    uint32_t sourceTime;
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t symbolSeqNum;
     uint32_t referencePrice;
     uint32_t pairedQty;
-    uint32_t imbalanceQty;
-    uint8_t auctionType;
+    uint32_t totalImbalanceQty;
+    uint32_t marketImbalanceQty;
+    uint16_t auctionTime;
+    char auctionType;
+    char imbalanceSide;
+    uint32_t continuousBookClearingPrice;
+    uint32_t auctionInterestClearingPrice;
+    uint32_t ssrFilingPrice;
     uint32_t indicativeMatchPrice;
+    uint32_t upperCollar;
+    uint32_t lowerCollar;
+    uint8_t auctionStatus;
+    uint8_t freezeStatus;
+    uint8_t numExtensions;
+    uint32_t unpairedQty;
+    char unpairedSide;
+    char significantImbalance;
+};
+
+// Add Order Refresh Message (Msg Type 106)
+struct AddOrderRefreshMessage : PillarMessageHeader {
+    uint32_t sourceTime;
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t symbolSeqNum;
+    uint64_t orderID;
+    uint32_t price;
+    uint32_t volume;
+    char side;
+    char firmID[5];
+    uint8_t reserved1;
 };
 
 // Non-Displayed Trade Message (Msg Type 110)
 struct NonDisplayedTradeMessage : PillarMessageHeader {
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t symbolSeqNum;
     uint64_t tradeID;
     uint32_t price;
     uint32_t volume;
     uint8_t printableFlag;
+    char tradeCond1;
+    char tradeCond2;
+    char tradeCond3;
+    char tradeCond4;
 };
 
 // Cross Trade Message (Msg Type 111)
 struct CrossTradeMessage : PillarMessageHeader {
-    uint64_t tradeID;
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t symbolSeqNum;
+    uint32_t crossID;
     uint32_t price;
     uint32_t volume;
-    uint8_t crossType;
-    uint8_t printableFlag;
+    char crossType;
 };
 
 // Trade Cancel Message (Msg Type 112)
 struct TradeCancelMessage : PillarMessageHeader {
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t symbolSeqNum;
     uint64_t tradeID;
-    uint8_t cancelReason;
-    uint64_t timestamp;
 };
 
 // Cross Correction Message (Msg Type 113)
 struct CrossCorrectionMessage : PillarMessageHeader {
-    uint64_t originalTradeID;
-    struct NewTradeDetails {
-        uint32_t price;
-        uint32_t volume;
-    } newTradeDetails;
-    uint8_t correctionReason;
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t symbolSeqNum;
+    uint32_t crossID;
+    uint32_t volume;
+};
+
+// Retail Price Improvement Message (Msg Type 114)
+struct RetailPriceImprovementMessage : PillarMessageHeader {
+    uint32_t sourceTimeNS;
+    uint32_t symbolIndex;
+    uint32_t symbolSeqNum;
+    char rpiIndicator;
 };
 
 #pragma pack(pop)
@@ -275,6 +380,7 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             SequenceNumberResetMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
             std::cout << "Sequence Number Reset: SourceTime=" << msg.sourceTime
+                      << ", SourceTimeNS=" << msg.sourceTimeNS
                       << ", ProductID=" << msg.productID
                       << ", ChannelID=" << msg.channelID << "\n";
             break;
@@ -286,9 +392,9 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             SourceTimeReferenceMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Source Time Reference: SourceTime=" << msg.sourceTime
-                      << ", SourceTimeNS=" << msg.sourceTimeNS
-                      << ", ID=" << msg.id << "\n";
+            std::cout << "Source Time Reference: ID=" << msg.id
+                      << ", SymbolSeqNum (reserved)=" << msg.symbolSeqNum
+                      << ", SourceTime=" << msg.sourceTime << "\n";
             break;
         }
         case MSG_TYPE_SYMBOL_INDEX_MAPPING: {
@@ -301,8 +407,17 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             std::cout << "Symbol Index Mapping: SymbolIndex=" << msg.symbolIndex
                       << ", Symbol=" << std::string(msg.symbol, strnlen(msg.symbol, 11))
                       << ", MarketID=" << msg.marketID
+                      << ", SystemID=" << static_cast<int>(msg.systemID)
+                      << ", ExchangeCode=" << msg.exchangeCode
                       << ", PriceScaleCode=" << static_cast<int>(msg.priceScaleCode)
-                      << ", SecurityType=" << static_cast<int>(msg.securityType) << "\n";
+                      << ", SecurityType=" << msg.securityType
+                      << ", LotSize=" << msg.lotSize
+                      << ", PrevClosePrice=" << msg.prevClosePrice
+                      << ", PrevCloseVolume=" << msg.prevCloseVolume
+                      << ", PriceResolution=" << static_cast<int>(msg.priceResolution)
+                      << ", RoundLot=" << msg.roundLot
+                      << ", MPV=" << msg.mpv
+                      << ", UnitOfTrade=" << msg.unitOfTrade << "\n";
             break;
         }
         case MSG_TYPE_SYMBOL_CLEAR: {
@@ -312,9 +427,10 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             SymbolClearMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Symbol Clear: SymbolIndex=" << msg.symbolIndex
-                      << ", NextSourceSeqNum=" << msg.nextSourceSeqNum
-                      << ", SourceTime=" << msg.sourceTime << "\n";
+            std::cout << "Symbol Clear: SourceTime=" << msg.sourceTime
+                      << ", SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", NextSourceSeqNum=" << msg.nextSourceSeqNum << "\n";
             break;
         }
         case MSG_TYPE_SECURITY_STATUS: {
@@ -324,9 +440,21 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             SecurityStatusMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Security Status: SymbolIndex=" << msg.symbolIndex
-                      << ", SecurityStatus=" << static_cast<int>(msg.securityStatus)
-                      << ", HaltCondition=" << static_cast<int>(msg.haltCondition) << "\n";
+            std::cout << "Security Status: SourceTime=" << msg.sourceTime
+                      << ", SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", SymbolSeqNum=" << msg.symbolSeqNum
+                      << ", SecurityStatus=" << msg.securityStatus
+                      << ", HaltCondition=" << msg.haltCondition
+                      << ", Reserved=" << msg.reserved << " (ignored)"
+                      << ", Price1=" << msg.price1
+                      << ", Price2=" << msg.price2
+                      << ", SSRTriggeringExchangeID=" << msg.ssrTriggeringExchangeID
+                      << ", SSRTriggeringVolume=" << msg.ssrTriggeringVolume
+                      << ", Time=" << msg.time << " (HHMMSSmmm format)"
+                      << ", SSRState=" << msg.ssrState << " (Short Sale Restriction State)"
+                      << ", MarketState=" << msg.marketState << " (Current Market State)"
+                      << ", SessionState=" << static_cast<int>(msg.sessionState) << " (Defaulted to 0x00)\n";
             break;
         }
         case MSG_TYPE_ADD_ORDER: {
@@ -336,8 +464,16 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             AddOrderMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Add Order: OrderID=" << msg.orderID << ", Price=" << msg.price
-                      << ", Volume=" << msg.volume << ", Side=" << msg.side << "\n";
+            std::cout << "Add Order: SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", SymbolSeqNum=" << msg.symbolSeqNum
+                      << ", OrderID=" << msg.orderID
+                      << ", Price=" << msg.price
+                      << ", Volume=" << msg.volume
+                      << ", Side=" << msg.side
+                      << " (" << (msg.side == 'B' ? "Buy" : "Sell") << ")"
+                      << ", FirmID=" << std::string(msg.firmID, strnlen(msg.firmID, 5))
+                      << ", Reserved1=" << static_cast<int>(msg.reserved1) << " (defaulted to 0)\n";
             break;
         }
         case MSG_TYPE_MODIFY_ORDER: {
@@ -347,8 +483,17 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             ModifyOrderMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Modify Order: OrderID=" << msg.orderID << ", Price=" << msg.price
-                      << ", Volume=" << msg.volume << "\n";
+            std::cout << "Add Order: SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", SymbolSeqNum=" << msg.symbolSeqNum
+                      << ", OrderID=" << msg.orderID
+                      << ", Price=" << msg.price
+                      << ", Volume=" << msg.volume
+                      << ", PositionChange=" << static_cast<int>(msg.positionChange)
+                      << " (" << (msg.positionChange == 0 ? "Kept position in book" : "Lost position in book") << ")"
+                      << ", Side=" << msg.side
+                      << " (" << (msg.side == 'B' ? "Buy" : "Sell")
+                      << ", Reserved2=" << static_cast<int>(msg.reserved2) << " (defaulted to 0)\n";
             break;
         }
         case MSG_TYPE_DELETE_ORDER: {
@@ -358,7 +503,11 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             DeleteOrderMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Delete Order: OrderID=" << msg.orderID << "\n";
+            std::cout << "Delete Order: SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", SymbolSeqNum=" << msg.symbolSeqNum
+                      << ", OrderID=" << msg.orderID
+                      << ", Reserved1=" << static_cast<int>(msg.reserved1) << " (defaulted to 0)\n";
             break;
         }
         case MSG_TYPE_ORDER_EXECUTION: {
@@ -368,9 +517,20 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             OrderExecutionMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Order Execution: OrderID=" << msg.orderID
-                      << ", TradeID=" << msg.tradeID << ", Price=" << msg.price
-                      << ", Volume=" << msg.volume << "\n";
+            std::cout << "Order Execution: SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", SymbolSeqNum=" << msg.symbolSeqNum
+                      << ", OrderID=" << msg.orderID
+                      << ", TradeID=" << msg.tradeID
+                      << ", Price=" << msg.price
+                      << ", Volume=" << msg.volume
+                      << ", PrintableFlag=" << static_cast<int>(msg.printableFlag)
+                      << " (" << (msg.printableFlag == 0 ? "Not Printed to SIP" : "Printed to SIP")
+                      << ", Reserved1=" << static_cast<int>(msg.reserved1) << " (defaulted to 0)"
+                      << ", TradeCond1=" << msg.tradeCond1
+                      << ", TradeCond2=" << msg.tradeCond2
+                      << ", TradeCond3=" << msg.tradeCond3
+                      << ", TradeCond4=" << msg.tradeCond4 << "\n";
             break;
         }
         case MSG_TYPE_REPLACE_ORDER: {
@@ -380,9 +540,16 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             ReplaceOrderMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Replace Order: OldOrderID=" << msg.oldOrderID
-                      << ", NewOrderID=" << msg.newOrderID << ", Price=" << msg.price
-                      << ", Volume=" << msg.volume << "\n";
+            std::cout << "Replace Order: SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", SymbolSeqNum=" << msg.symbolSeqNum
+                      << ", OrderID=" << msg.orderID
+                      << ", NewOrderID=" << msg.newOrderID
+                      << ", Price=" << msg.price
+                      << ", Volume=" << msg.volume
+                      << ", Side=" << msg.side
+                      << " (" << (msg.side == 'B' ? "Buy" : "Sell")
+                      << ", Reserved2=" << static_cast<int>(msg.reserved2) << " (defaulted to 0)\n";
             break;
         }
         case MSG_TYPE_IMBALANCE: {
@@ -392,11 +559,49 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             ImbalanceMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Imbalance Message: ReferencePrice=" << msg.referencePrice
+            std::cout << "Imbalance Message: SourceTime=" << msg.sourceTime
+                      << ", SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", SymbolSeqNum=" << msg.symbolSeqNum
+                      << ", ReferencePrice=" << msg.referencePrice
                       << ", PairedQty=" << msg.pairedQty
-                      << ", ImbalanceQty=" << msg.imbalanceQty
-                      << ", AuctionType=" << static_cast<int>(msg.auctionType)
-                      << ", IndicativeMatchPrice=" << msg.indicativeMatchPrice << "\n";
+                      << ", TotalImbalanceQty=" << msg.totalImbalanceQty
+                      << ", MarketImbalanceQty=" << msg.marketImbalanceQty
+                      << ", AuctionTime=" << msg.auctionTime
+                      << ", AuctionType=" << msg.auctionType
+                      << ", ImbalanceSide=" << msg.imbalanceSide
+                      << ", ContinuousBookClearingPrice=" << msg.continuousBookClearingPrice
+                      << ", AuctionInterestClearingPrice=" << msg.auctionInterestClearingPrice
+                      << ", SSRFilingPrice=" << msg.ssrFilingPrice
+                      << ", IndicativeMatchPrice=" << msg.indicativeMatchPrice
+                      << ", UpperCollar=" << msg.upperCollar
+                      << ", LowerCollar=" << msg.lowerCollar
+                      << ", AuctionStatus=" << static_cast<int>(msg.auctionStatus)
+                      << ", FreezeStatus=" << static_cast<int>(msg.freezeStatus)
+                      << ", NumExtensions=" << static_cast<int>(msg.numExtensions)
+                      << ", UnpairedQty=" << msg.unpairedQty
+                      << ", UnpairedSide=" << msg.unpairedSide
+                      << ", SignificantImbalance=" << msg.significantImbalance << "\n";
+            break;
+        }
+        case MSG_TYPE_ADD_ORDER_REFRESH: {
+            if (size < sizeof(AddOrderRefreshMessage)) {
+                std::cerr << "Invalid Add Order Message size.\n";
+                return;
+            }
+            AddOrderRefreshMessage msg;
+            std::memcpy(&msg, buffer, sizeof(msg));
+            std::cout << "Add Order Refresh: SourceTime=" << msg.sourceTime
+                      << ", SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", SymbolSeqNum=" << msg.symbolSeqNum
+                      << ", OrderID=" << msg.orderID
+                      << ", Price=" << msg.price
+                      << ", Volume=" << msg.volume
+                      << ", Side=" << msg.side
+                      << " (" << (msg.side == 'B' ? "Buy" : "Sell")
+                      << ", FirmID=" << std::string(msg.firmID, strnlen(msg.firmID, 5))
+                      << ", Reserved1=" << static_cast<int>(msg.reserved1) << " (defaulted to 0)\n";
             break;
         }
         case MSG_TYPE_NON_DISPLAYED_TRADE: {
@@ -406,10 +611,18 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             NonDisplayedTradeMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Non-Displayed Trade: TradeID=" << msg.tradeID
+            std::cout << "Non-Displayed Trade: SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", SymbolSeqNum=" << msg.symbolSeqNum
+                      << ", TradeID=" << msg.tradeID
                       << ", Price=" << msg.price
                       << ", Volume=" << msg.volume
-                      << ", PrintableFlag=" << static_cast<int>(msg.printableFlag) << "\n";
+                      << ", PrintableFlag=" << static_cast<int>(msg.printableFlag)
+                      << " (" << (msg.printableFlag == 0 ? "Not Printed to SIP" : "Printed to SIP")
+                      << ", TradeCond1=" << msg.tradeCond1
+                      << ", TradeCond2=" << msg.tradeCond2
+                      << ", TradeCond3=" << msg.tradeCond3
+                      << ", TradeCond4=" << msg.tradeCond4 << "\n";
             break;
         }
         case MSG_TYPE_CROSS_TRADE: {
@@ -419,11 +632,18 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             CrossTradeMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Cross Trade: TradeID=" << msg.tradeID
+            std::cout << "Cross Trade: SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", SymbolSeqNum=" << msg.symbolSeqNum
+                      << ", CrossID=" << msg.crossID
                       << ", Price=" << msg.price
                       << ", Volume=" << msg.volume
-                      << ", CrossType=" << static_cast<int>(msg.crossType)
-                      << ", PrintableFlag=" << static_cast<int>(msg.printableFlag) << "\n";
+                      << ", CrossType=" << msg.crossType
+                      << " (" << (msg.crossType == 'E' ? "Market Center Early Opening Auction" :
+                                  msg.crossType == 'O' ? "Market Center Opening Auction" :
+                                  msg.crossType == '5' ? "Market Center Reopening Auction" :
+                                  msg.crossType == '6' ? "Market Center Closing Auction" :
+                                  "Unknown Cross Type") << ")\n";
             break;
         }
         case MSG_TYPE_TRADE_CANCEL: {
@@ -433,22 +653,42 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             TradeCancelMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Trade Cancel: TradeID=" << msg.tradeID
-                      << ", CancelReason=" << static_cast<int>(msg.cancelReason)
-                      << ", Timestamp=" << msg.timestamp << "\n";
+            std::cout << "Trade Cancel: SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", SymbolSeqNum=" << msg.symbolSeqNum
+                      << ", TradeID=" << msg.tradeID << "\n";
             break;
         }
-        case MSG_TYPE_CROSS_CORRECTION: { // Cross Correction Message
+        case MSG_TYPE_CROSS_CORRECTION: {
             if (size < sizeof(CrossCorrectionMessage)) {
                 std::cerr << "Invalid Cross Correction Message size.\n";
                 return;
             }
             CrossCorrectionMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Cross Correction: OriginalTradeID=" << msg.originalTradeID
-                      << ", New Price=" << msg.newTradeDetails.price
-                      << ", New Volume=" << msg.newTradeDetails.volume
-                      << ", CorrectionReason=" << static_cast<int>(msg.correctionReason) << "\n";
+            std::cout << "Cross Correction: SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", SymbolSeqNum=" << msg.symbolSeqNum
+                      << ", CrossID=" << msg.crossID
+                      << ", Volume=" << msg.volume << "\n";
+            break;
+        }
+        case MSG_TYPE_RETAIL_PRICE_IMPROVEMENT: {
+            if (size < sizeof(RetailPriceImprovementMessage)) {
+                std::cerr << "Invalid Cross Correction Message size.\n";
+                return;
+            }
+            RetailPriceImprovementMessage msg;
+            std::memcpy(&msg, buffer, sizeof(msg));
+            std::cout << "Cross Correction: SourceTimeNS=" << msg.sourceTimeNS
+                      << ", SymbolIndex=" << msg.symbolIndex
+                      << ", SymbolSeqNum=" << msg.symbolSeqNum
+                      << ", RPIIndicator=" << msg.rpiIndicator
+                      << " (" << (msg.rpiIndicator == ' ' ? "No retail interest" :
+                                  msg.rpiIndicator == 'A' ? "Retail interest on the bid side" :
+                                  msg.rpiIndicator == 'B' ? "Retail interest on the offer side" :
+                                  msg.rpiIndicator == 'C' ? "Retail interest on both bid and offer sides" :
+                                  "Unknown RPIIndicator") << ")\n";
             break;
         }
         default:
@@ -523,9 +763,8 @@ void parsePillarStream(const uint8_t* data, uint16_t length) {
 
         // Pass message data for further processing
         const uint8_t* msgData = messagePtr + 4;
-        uint16_t msgLength = msgSize - 4;
         
-        handleMessage(msgType, msgData, msgLength);
+        handleMessage(msgType, msgData, msgSize);
 
         // Advance to the next message
         bytesProcessed += msgSize;
