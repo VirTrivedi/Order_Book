@@ -1,10 +1,27 @@
-#include <pcap.h>
 #include <iostream>
+#include <unordered_map>
+#include <map>
+#include <list>
+#include <string>
+#include <iomanip>
+#include <pcap.h>
 #include <cstring>
 #include <cstdint>
 #include <arpa/inet.h>
 
 #pragma pack(push, 1)
+
+// Order Definition
+struct Order {
+    uint64_t orderID;
+    uint32_t price;
+    uint32_t volume;
+    char side;
+    std::string firmID;
+
+    Order(uint64_t id, uint32_t p, uint32_t v, char s, const std::string& f)
+        : orderID(id), price(p), volume(v), side(s), firmID(f) {}
+};
 
 // Ethernet Header Definition
 struct mac_hdr_t {
@@ -301,6 +318,83 @@ struct RetailPriceImprovementMessage : PillarMessageHeader {
 
 #pragma pack(pop)
 
+class OrderBook {
+private:
+    std::unordered_map<uint64_t, Order*> orderMap;
+    std::map<uint32_t, std::list<Order>> bids;
+    std::map<uint32_t, std::list<Order>> asks;   
+
+public:
+    void addOrder(const AddOrderMessage& msg) {
+        Order newOrder(msg.orderID, msg.price, msg.volume, msg.side, std::string(msg.firmID, 5));
+        auto& bookSide = (msg.side == 'B') ? bids : asks;
+
+        bookSide[msg.price].push_back(newOrder);
+        orderMap[msg.orderID] = &bookSide[msg.price].back();
+
+        std::cout << "Added Order: ID=" << msg.orderID << ", Price=" << msg.price
+                  << ", Volume=" << msg.volume << ", Side=" << (msg.side == 'B' ? "Buy" : "Sell") << "\n";
+    }
+    void modifyOrder(const ModifyOrderMessage& msg) {
+        auto it = orderMap.find(msg.orderID);
+        
+        if (it != orderMap.end()) {
+            Order* order = it->second;
+            std::cout << "Modifying Order: ID=" << order->orderID << "\n";
+            order->price = msg.price;
+            order->volume = msg.volume;
+            order->side = msg.side;
+        } else {
+            std::cerr << "Order ID " << msg.orderID << " not found for modification\n";
+        }
+    }
+    void deleteOrder(const DeleteOrderMessage& msg) {
+        auto it = orderMap.find(msg.orderID);
+        
+        if (it != orderMap.end()) {
+            Order* order = it->second;
+            auto& bookSide = (order->side == 'B') ? bids : asks;
+
+            auto levelIt = bookSide.find(order->price);
+            if (levelIt != bookSide.end()) {
+                levelIt->second.remove(*order);
+                
+                if (levelIt->second.empty()) {
+                    bookSide.erase(levelIt);
+                }
+            }
+
+            orderMap.erase(it);
+
+            std::cout << "Deleted Order: ID=" << msg.orderID << "\n";
+        } else {
+            std::cerr << "Order ID " << msg.orderID << " not found for deletion\n";
+        }
+    }
+    void printOrderBook() const {
+        std::cout << "\nOrder Book (Bids):\n";
+        for (const auto& [price, orders] : bids) {
+            std::cout << "Price " << price << ": ";
+            for (const auto& order : orders) {
+                std::cout << "[ID=" << order.orderID << ", Vol=" << order.volume << "] ";
+            }
+            std::cout << "\n";
+        }
+
+        std::cout << "\nOrder Book (Asks):\n";
+        for (const auto& [price, orders] : asks) {
+            std::cout << "Price " << price << ": ";
+            for (const auto& order : orders) {
+                std::cout << "[ID=" << order.orderID << ", Vol=" << order.volume << "] ";
+            }
+            std::cout << "\n";
+        }
+    }
+};
+
+// Instantiate a global order book
+OrderBook orderBook;
+
 // Function to convert MAC address to human-readable string
 std::string macToString(const uint8_t* mac) {
     char mac_str[18];
@@ -386,8 +480,8 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             break;
         }
         case MSG_TYPE_SOURCE_TIME_REFERENCE: {
-            if (size < sizeof(SequenceNumberResetMessage)) {
-                std::cerr << "Invalid Sequence Number Reset Message size.\n";
+            if (size < sizeof(SourceTimeReferenceMessage)) {
+                std::cerr << "Invalid Source Time Reference Message size.\n";
                 return;
             }
             SourceTimeReferenceMessage msg;
@@ -398,8 +492,8 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             break;
         }
         case MSG_TYPE_SYMBOL_INDEX_MAPPING: {
-            if (size < sizeof(SequenceNumberResetMessage)) {
-                std::cerr << "Invalid Sequence Number Reset Message size.\n";
+            if (size < sizeof(SymbolIndexMappingMessage)) {
+                std::cerr << "Invalid Symbol Index Mapping Message size.\n";
                 return;
             }
             SymbolIndexMappingMessage msg;
@@ -421,8 +515,8 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             break;
         }
         case MSG_TYPE_SYMBOL_CLEAR: {
-            if (size < sizeof(SequenceNumberResetMessage)) {
-                std::cerr << "Invalid Sequence Number Reset Message size.\n";
+            if (size < sizeof(SymbolClearMessage)) {
+                std::cerr << "Invalid Symbol Clear Message size.\n";
                 return;
             }
             SymbolClearMessage msg;
@@ -434,8 +528,8 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             break;
         }
         case MSG_TYPE_SECURITY_STATUS: {
-            if (size < sizeof(AddOrderMessage)) {
-                std::cerr << "Invalid Add Order Message size.\n";
+            if (size < sizeof(SecurityStatusMessage)) {
+                std::cerr << "Invalid Security Status Message size.\n";
                 return;
             }
             SecurityStatusMessage msg;
@@ -464,16 +558,15 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             AddOrderMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Add Order: SourceTimeNS=" << msg.sourceTimeNS
-                      << ", SymbolIndex=" << msg.symbolIndex
-                      << ", SymbolSeqNum=" << msg.symbolSeqNum
-                      << ", OrderID=" << msg.orderID
-                      << ", Price=" << msg.price
-                      << ", Volume=" << msg.volume
-                      << ", Side=" << msg.side
-                      << " (" << (msg.side == 'B' ? "Buy" : "Sell") << ")"
-                      << ", FirmID=" << std::string(msg.firmID, strnlen(msg.firmID, 5))
-                      << ", Reserved1=" << static_cast<int>(msg.reserved1) << " (defaulted to 0)\n";
+
+            // Debugging: Dump raw data
+            std::cout << "[Debug] Raw AddOrderMessage Data: ";
+            for (size_t i = 0; i < sizeof(msg); ++i) {
+                std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)buffer[i] << " ";
+            }
+            std::cout << std::dec << "\n";
+
+            orderBook.addOrder(msg);
             break;
         }
         case MSG_TYPE_MODIFY_ORDER: {
@@ -483,17 +576,15 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             ModifyOrderMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Add Order: SourceTimeNS=" << msg.sourceTimeNS
-                      << ", SymbolIndex=" << msg.symbolIndex
-                      << ", SymbolSeqNum=" << msg.symbolSeqNum
-                      << ", OrderID=" << msg.orderID
-                      << ", Price=" << msg.price
-                      << ", Volume=" << msg.volume
-                      << ", PositionChange=" << static_cast<int>(msg.positionChange)
-                      << " (" << (msg.positionChange == 0 ? "Kept position in book" : "Lost position in book") << ")"
-                      << ", Side=" << msg.side
-                      << " (" << (msg.side == 'B' ? "Buy" : "Sell")
-                      << ", Reserved2=" << static_cast<int>(msg.reserved2) << " (defaulted to 0)\n";
+
+            // Debugging: Dump raw data
+            std::cout << "[Debug] Raw ModifyOrderMessage Data: ";
+            for (size_t i = 0; i < sizeof(msg); ++i) {
+                std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)buffer[i] << " ";
+            }
+            std::cout << std::dec << "\n";
+
+            orderBook.modifyOrder(msg);
             break;
         }
         case MSG_TYPE_DELETE_ORDER: {
@@ -503,11 +594,15 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             DeleteOrderMessage msg;
             std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Delete Order: SourceTimeNS=" << msg.sourceTimeNS
-                      << ", SymbolIndex=" << msg.symbolIndex
-                      << ", SymbolSeqNum=" << msg.symbolSeqNum
-                      << ", OrderID=" << msg.orderID
-                      << ", Reserved1=" << static_cast<int>(msg.reserved1) << " (defaulted to 0)\n";
+
+            // Debugging: Dump raw data
+            std::cout << "[Debug] Raw DeleteOrderMessage Data: ";
+            for (size_t i = 0; i < sizeof(msg); ++i) {
+                std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)buffer[i] << " ";
+            }
+            std::cout << std::dec << "\n";
+
+            orderBook.deleteOrder(msg);
             break;
         }
         case MSG_TYPE_ORDER_EXECUTION: {
@@ -553,8 +648,8 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             break;
         }
         case MSG_TYPE_IMBALANCE: {
-            if (size < sizeof(ReplaceOrderMessage)) {
-                std::cerr << "Invalid Replace Order Message size.\n";
+            if (size < sizeof(ImbalanceMessage)) {
+                std::cerr << "Invalid Imbalance Message size.\n";
                 return;
             }
             ImbalanceMessage msg;
@@ -586,7 +681,7 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
         }
         case MSG_TYPE_ADD_ORDER_REFRESH: {
             if (size < sizeof(AddOrderRefreshMessage)) {
-                std::cerr << "Invalid Add Order Message size.\n";
+                std::cerr << "Invalid Add Order Refresh Message size.\n";
                 return;
             }
             AddOrderRefreshMessage msg;
@@ -675,7 +770,7 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
         }
         case MSG_TYPE_RETAIL_PRICE_IMPROVEMENT: {
             if (size < sizeof(RetailPriceImprovementMessage)) {
-                std::cerr << "Invalid Cross Correction Message size.\n";
+                std::cerr << "Invalid Retail Price Improvement Message size.\n";
                 return;
             }
             RetailPriceImprovementMessage msg;
