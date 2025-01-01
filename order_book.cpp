@@ -412,7 +412,7 @@ bool parseEthernetHeader(const u_char* data, mac_hdr_t& eth_header) {
 
     std::cout << "[Ethernet Header] Dest MAC: " << macToString(eth_header.dest_mac)
               << ", Src MAC: " << macToString(eth_header.src_mac)
-              << ", Ethertype: 0x" << std::hex << eth_header.ethertype << std::dec << std::endl;
+              << ", Ethertype (Binary): " << std::bitset<16>(eth_header.ethertype) << std::endl;
 
     return true;
 }
@@ -453,14 +453,6 @@ bool parseUDPHeader(const u_char* data, udp_hdr_t& udp_header) {
               << ", Length: " << udp_header.length << std::endl;
 
     return true;
-}
-
-void printHex(const u_char* data, size_t length) {
-    for (size_t i = 0; i < length; ++i) {
-        printf("%02x ", data[i]);
-        if ((i + 1) % 16 == 0) printf("\n");
-    }
-    printf("\n");
 }
 
 // Dispatcher function
@@ -560,11 +552,11 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             std::memcpy(&msg, buffer, sizeof(msg));
 
             // Debugging: Dump raw data
-            std::cout << "[Debug] Raw AddOrderMessage Data: ";
+            std::cout << "[Debug] Raw AddOrderMessage Data (Binary): ";
             for (size_t i = 0; i < sizeof(msg); ++i) {
-                std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)buffer[i] << " ";
+                std::cout << std::bitset<8>(buffer[i]) << " ";
             }
-            std::cout << std::dec << "\n";
+            std::cout << "\n";
 
             orderBook.addOrder(msg);
             break;
@@ -580,9 +572,9 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             // Debugging: Dump raw data
             std::cout << "[Debug] Raw ModifyOrderMessage Data: ";
             for (size_t i = 0; i < sizeof(msg); ++i) {
-                std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)buffer[i] << " ";
+                std::cout << std::bitset<8>(buffer[i]) << " ";
             }
-            std::cout << std::dec << "\n";
+            std::cout << "\n";
 
             orderBook.modifyOrder(msg);
             break;
@@ -598,9 +590,9 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             // Debugging: Dump raw data
             std::cout << "[Debug] Raw DeleteOrderMessage Data: ";
             for (size_t i = 0; i < sizeof(msg); ++i) {
-                std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)buffer[i] << " ";
+                std::cout << std::bitset<8>(buffer[i]) << " ";
             }
-            std::cout << std::dec << "\n";
+            std::cout << "\n";
 
             orderBook.deleteOrder(msg);
             break;
@@ -792,15 +784,6 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
     }
 }
 
-void debugHexDump(const uint8_t* data, size_t length, const std::string& label) {
-    std::cout << "[Debug] Hex Dump (" << label << "):\n";
-    for (size_t i = 0; i < length; ++i) {
-        printf("%02x ", data[i]);
-        if ((i + 1) % 16 == 0) printf("\n");
-    }
-    printf("\n");
-}
-
 void parsePillarStream(const uint8_t* data, uint16_t length) {
     if (length < 16) {
         std::cerr << "[Error] Insufficient data for Packet Header\n";
@@ -846,12 +829,19 @@ void parsePillarStream(const uint8_t* data, uint16_t length) {
         memcpy(&msgType, messagePtr + 2, sizeof(msgType));
 
         // Debug: Validate raw msgSize bytes
-        std::cout << "[Debug] Hex Dump (Message Header):\n";
-        printHex(messagePtr, 4);
-        std::cout << "[Debug] Raw Message Size Bytes: " << std::hex
-                  << static_cast<int>(messagePtr[0]) << " "
-                  << static_cast<int>(messagePtr[1]) << std::dec << "\n";
-        
+        std::cout << "[Debug] Binary Dump (Message Header):\n";
+        for (size_t i = 0; i < 4; ++i) {
+            for (int bit = 7; bit >= 0; --bit) {
+                std::cout << ((messagePtr[i] >> bit) & 1);
+            }
+            std::cout << " ";
+        }
+        std::cout << "\n";
+
+        std::cout << "[Debug] Raw Message Size Bytes (Binary): " 
+                  << std::bitset<8>(messagePtr[0]) << " " 
+                  << std::bitset<8>(messagePtr[1]) << "\n";
+
         std::cout << "[Debug] Message Size (before validation): " << msgSize << "\n";
         std::cout << "[Message Header] Message Type: " << msgType
                   << ", Message Size: " << msgSize << "\n";
