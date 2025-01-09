@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 #include <unordered_map>
 #include <map>
 #include <list>
@@ -78,11 +79,6 @@ struct PillarStreamHeader {
     uint64_t sendTime;
 };
 
-// Pillar Message Header
-struct PillarMessageHeader {
-    uint16_t messageSize;
-    uint16_t messageType;
-};
 
 // Define message types
 constexpr uint16_t MSG_TYPE_SEQUENCE_NUMBER_RESET = 1;
@@ -104,7 +100,7 @@ constexpr uint16_t MSG_TYPE_CROSS_CORRECTION = 113;
 constexpr uint16_t MSG_TYPE_RETAIL_PRICE_IMPROVEMENT = 114;
 
 // Sequence Number Reset Message (Msg Type 1)
-struct SequenceNumberResetMessage : PillarMessageHeader {
+struct SequenceNumberResetMessage {
     uint32_t sourceTime;
     uint32_t sourceTimeNS;
     uint8_t productID;
@@ -112,14 +108,14 @@ struct SequenceNumberResetMessage : PillarMessageHeader {
 };
 
 // Source Time Reference Message (Msg Type 2)
-struct SourceTimeReferenceMessage : PillarMessageHeader {
+struct SourceTimeReferenceMessage {
     uint32_t id;
     uint32_t symbolSeqNum;
     uint32_t sourceTime;
 };
 
 // Symbol Index Mapping Message (Msg Type 3)
-struct SymbolIndexMappingMessage : PillarMessageHeader {
+struct SymbolIndexMappingMessage {
     uint32_t symbolIndex;
     char symbol[11];
     uint8_t reserved1;
@@ -139,7 +135,7 @@ struct SymbolIndexMappingMessage : PillarMessageHeader {
 };
 
 // Symbol Clear Message (Msg Type 32)
-struct SymbolClearMessage : PillarMessageHeader {
+struct SymbolClearMessage {
     uint32_t sourceTime;
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
@@ -147,7 +143,7 @@ struct SymbolClearMessage : PillarMessageHeader {
 };
 
 // Security Status Message (Msg Type 34)
-struct SecurityStatusMessage : PillarMessageHeader {
+struct SecurityStatusMessage {
     uint32_t sourceTime;
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
@@ -179,7 +175,7 @@ struct AddOrderMessage {
 };
 
 // Modify Order Message (Msg Type 101)
-struct ModifyOrderMessage : PillarMessageHeader {
+struct ModifyOrderMessage {
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
     uint32_t symbolSeqNum;
@@ -192,7 +188,7 @@ struct ModifyOrderMessage : PillarMessageHeader {
 };
 
 // Delete Order Message (Msg Type 102)
-struct DeleteOrderMessage : PillarMessageHeader {
+struct DeleteOrderMessage {
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
     uint32_t symbolSeqNum;
@@ -201,7 +197,7 @@ struct DeleteOrderMessage : PillarMessageHeader {
 };
 
 // Order Execution Message (Msg Type 103)
-struct OrderExecutionMessage : PillarMessageHeader {
+struct OrderExecutionMessage {
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
     uint32_t symbolSeqNum;
@@ -218,7 +214,7 @@ struct OrderExecutionMessage : PillarMessageHeader {
 };
 
 // Replace Order Message (Msg Type 104)
-struct ReplaceOrderMessage : PillarMessageHeader {
+struct ReplaceOrderMessage {
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
     uint32_t symbolSeqNum;
@@ -231,7 +227,7 @@ struct ReplaceOrderMessage : PillarMessageHeader {
 };
 
 // Imbalance Message (Msg Type 105)
-struct ImbalanceMessage : PillarMessageHeader {
+struct ImbalanceMessage {
     uint32_t sourceTime;
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
@@ -258,7 +254,7 @@ struct ImbalanceMessage : PillarMessageHeader {
 };
 
 // Add Order Refresh Message (Msg Type 106)
-struct AddOrderRefreshMessage : PillarMessageHeader {
+struct AddOrderRefreshMessage {
     uint32_t sourceTime;
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
@@ -272,7 +268,7 @@ struct AddOrderRefreshMessage : PillarMessageHeader {
 };
 
 // Non-Displayed Trade Message (Msg Type 110)
-struct NonDisplayedTradeMessage : PillarMessageHeader {
+struct NonDisplayedTradeMessage {
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
     uint32_t symbolSeqNum;
@@ -287,7 +283,7 @@ struct NonDisplayedTradeMessage : PillarMessageHeader {
 };
 
 // Cross Trade Message (Msg Type 111)
-struct CrossTradeMessage : PillarMessageHeader {
+struct CrossTradeMessage {
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
     uint32_t symbolSeqNum;
@@ -298,7 +294,7 @@ struct CrossTradeMessage : PillarMessageHeader {
 };
 
 // Trade Cancel Message (Msg Type 112)
-struct TradeCancelMessage : PillarMessageHeader {
+struct TradeCancelMessage {
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
     uint32_t symbolSeqNum;
@@ -306,7 +302,7 @@ struct TradeCancelMessage : PillarMessageHeader {
 };
 
 // Cross Correction Message (Msg Type 113)
-struct CrossCorrectionMessage : PillarMessageHeader {
+struct CrossCorrectionMessage {
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
     uint32_t symbolSeqNum;
@@ -315,7 +311,7 @@ struct CrossCorrectionMessage : PillarMessageHeader {
 };
 
 // Retail Price Improvement Message (Msg Type 114)
-struct RetailPriceImprovementMessage : PillarMessageHeader {
+struct RetailPriceImprovementMessage {
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
     uint32_t symbolSeqNum;
@@ -328,17 +324,48 @@ class OrderBook {
 private:
     std::unordered_map<uint64_t, Order*> orderMap;
     std::map<uint32_t, std::list<Order>> bids;
-    std::map<uint32_t, std::list<Order>> asks;   
+    std::map<uint32_t, std::list<Order>> asks;
+    std::vector<uint32_t> top10Bids;
+    std::vector<uint32_t> top10Asks;
+
+    std::vector<uint32_t> getTopPrices(const std::map<uint32_t, std::list<Order>>& book, bool reverse = false) const {
+        std::vector<uint32_t> topPrices;
+        if (reverse) {
+            for (auto it = book.rbegin(); it != book.rend() && topPrices.size() < 10; ++it) {
+                topPrices.push_back(it->first);
+            }
+        } else {
+            for (auto it = book.begin(); it != book.end() && topPrices.size() < 10; ++it) {
+                topPrices.push_back(it->first);
+            }
+        }
+        return topPrices;
+    }
 
 public:
+    void clearOrders() {
+        bids.clear();
+        asks.clear();
+        orderMap.clear();
+        std::cout << "Order book cleared.\n";
+}
     void addOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum, 
                   uint64_t orderID, uint32_t price, uint32_t volume, char side, 
-                  const std::string& firmID) {
+                  const std::string& firmID, bool& top10Changed) {
         Order newOrder(orderID, price, volume, side, firmID);
         auto& bookSide = (side == 'B') ? bids : asks;
 
         bookSide[price].push_back(newOrder);
         orderMap[orderID] = &bookSide[price].back();
+
+        const auto& newTopBids = getTopPrices(bids, true);
+        const auto& newTopAsks = getTopPrices(asks);
+
+        top10Changed = (newTopBids != top10Bids || newTopAsks != top10Asks);
+        if (top10Changed) {
+            top10Bids = newTopBids;
+            top10Asks = newTopAsks;
+        }
 
         std::cout << "Added Order: \n"
                   << "  SourceTimeNS: " << sourceTimeNS << "\n"
@@ -352,7 +379,7 @@ public:
     }
     void modifyOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum,
                      uint64_t orderID, uint32_t price, uint32_t volume,
-                     uint8_t positionChange, char side) {
+                     uint8_t positionChange, char side, bool& top10Changed) {
         auto it = orderMap.find(orderID);
         
         if (it != orderMap.end()) {
@@ -366,13 +393,95 @@ public:
             order->volume = volume;
             order->side = side;
 
+            const auto& newTopBids = getTopPrices(bids, true);
+            const auto& newTopAsks = getTopPrices(asks);
+
+            top10Changed = (newTopBids != top10Bids || newTopAsks != top10Asks);
+            if (top10Changed) {
+                top10Bids = newTopBids;
+                top10Asks = newTopAsks;
+            }
+
             std::cout << "  Modified State -> ID: " << order->orderID << ", Price: " << order->price
                       << ", Volume: " << order->volume << ", Side: " << (order->side == 'B' ? "Buy" : "Sell") << "\n";
         } else {
             std::cerr << "Order ID " << orderID << " not found for modification\n";
         }
     }
-    void deleteOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum, uint64_t orderID) {
+    void orderExecution(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum,
+                    uint64_t orderID, uint64_t tradeID, uint32_t price, uint32_t volume,
+                    uint8_t printableFlag, char tradeCond1, char tradeCond2, 
+                    char tradeCond3, char tradeCond4, bool& top10Changed) {
+        auto it = orderMap.find(orderID);
+
+        if (it != orderMap.end()) {
+            Order* order = it->second;
+
+            std::cout << "Executing Order:\n"
+                      << "  Current State -> ID: " << order->orderID << ", Price: " << order->price
+                      << ", Volume: " << order->volume << ", Side: " << (order->side == 'B' ? "Buy" : "Sell") << "\n";
+
+            if (order->volume >= volume) {
+                order->volume -= volume;
+            } else {
+                std::cerr << "Error: Execution volume exceeds order volume for Order ID " << orderID << "\n";
+                return;
+            }
+
+            if (order->volume == 0) {
+                auto& bookSide = (order->side == 'B') ? bids : asks;
+                auto levelIt = bookSide.find(order->price);
+
+                if (levelIt != bookSide.end()) {
+                    auto& orderList = levelIt->second;
+                    auto orderInList = std::find_if(orderList.begin(), orderList.end(),
+                        [&](const Order& o) { return o.orderID == order->orderID; });
+
+                    if (orderInList != orderList.end()) {
+                        orderList.erase(orderInList);
+
+                        if (orderList.empty()) {
+                            bookSide.erase(levelIt);
+                        }
+                    }
+                }
+
+                orderMap.erase(it);
+            }
+
+            const auto& newTopBids = getTopPrices(bids, true);
+            const auto& newTopAsks = getTopPrices(asks);
+
+            top10Changed = (newTopBids != top10Bids || newTopAsks != top10Asks);
+            if (top10Changed) {
+                top10Bids = newTopBids;
+                top10Asks = newTopAsks;
+            }
+
+            std::cout << "Order Executed: \n"
+                      << "  SourceTimeNS: " << sourceTimeNS << "\n"
+                      << "  SymbolIndex: " << symbolIndex << "\n"
+                      << "  SymbolSeqNum: " << symbolSeqNum << "\n"
+                      << "  OrderID: " << orderID << "\n"
+                      << "  TradeID: " << tradeID << "\n"
+                      << "  Price: " << price << "\n"
+                      << "  Volume: " << volume << "\n"
+                      << "  PrintableFlag: " << static_cast<int>(printableFlag) << " (" 
+                      << (printableFlag == 0 ? "Not Printed to SIP" : "Printed to SIP") << ")\n"
+                      << "  Trade Conditions: " << tradeCond1 << ", " << tradeCond2 << ", " << tradeCond3 << ", " << tradeCond4 << "\n";
+        } else {
+            std::cerr << "Order ID " << orderID << " not found for execution\n";
+        }
+    }
+    void replaceOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum, 
+                  uint64_t oldOrderID, uint64_t newOrderID, uint32_t price, 
+                  uint32_t volume, char side, bool& top10Changed) {
+        deleteOrder(sourceTimeNS, symbolIndex, symbolSeqNum, oldOrderID, top10Changed);
+
+        addOrder(sourceTimeNS, symbolIndex, symbolSeqNum, newOrderID, price, volume, side, "", top10Changed);
+    }
+    void deleteOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum, 
+                     uint64_t orderID, bool& top10Changed) {
         auto it = orderMap.find(orderID);
         
         if (it != orderMap.end()) {
@@ -401,6 +510,15 @@ public:
 
             orderMap.erase(it);
 
+            const auto& newTopBids = getTopPrices(bids, true);
+            const auto& newTopAsks = getTopPrices(asks);
+
+            top10Changed = (newTopBids != top10Bids || newTopAsks != top10Asks);
+            if (top10Changed) {
+                top10Bids = newTopBids;
+                top10Asks = newTopAsks;
+            }
+
             std::cout << "Deleted Order: \n"
                       << "  SourceTimeNS: " << sourceTimeNS << "\n"
                       << "  SymbolIndex: " << symbolIndex << "\n"
@@ -410,35 +528,230 @@ public:
             std::cerr << "Order ID " << orderID << " not found for deletion\n";
         }
     }
-    void printOrderBook() const {
-    std::cout << "\nOrder Book (Top 10 Bids):\n";
-    int bidCount = 0;
-    for (auto it = bids.rbegin(); it != bids.rend() && bidCount < 10; ++it, ++bidCount) {
-        const auto& price = it->first;
-        const auto& orders = it->second;
-        std::cout << "Price " << price << ": ";
-        for (const auto& order : orders) {
-            std::cout << "[ID=" << order.orderID << ", Vol=" << order.volume << "] ";
-        }
-        std::cout << "\n";
-    }
+    void processImbalance(const ImbalanceMessage& msg) {
+        std::cout << "Processing Imbalance Message:\n"
+                  << "  ReferencePrice: " << msg.referencePrice << "\n"
+                  << "  PairedQty: " << msg.pairedQty << "\n"
+                  << "  TotalImbalanceQty: " << msg.totalImbalanceQty << "\n"
+                  << "  MarketImbalanceQty: " << msg.marketImbalanceQty << "\n"
+                  << "  AuctionTime: " << msg.auctionTime << "\n"
+                  << "  AuctionType: " << msg.auctionType << "\n"
+                  << "  ImbalanceSide: " << (msg.imbalanceSide == 'B' ? "Buy" : "Sell") << "\n"
+                  << "  ContinuousBookClearingPrice: " << msg.continuousBookClearingPrice << "\n"
+                  << "  AuctionInterestClearingPrice: " << msg.auctionInterestClearingPrice << "\n"
+                  << "  SSRFilingPrice: " << msg.ssrFilingPrice << "\n"
+                  << "  IndicativeMatchPrice: " << msg.indicativeMatchPrice << "\n"
+                  << "  UpperCollar: " << msg.upperCollar << "\n"
+                  << "  LowerCollar: " << msg.lowerCollar << "\n"
+                  << "  AuctionStatus: " << static_cast<int>(msg.auctionStatus) << "\n"
+                  << "  FreezeStatus: " << static_cast<int>(msg.freezeStatus) << "\n"
+                  << "  NumExtensions: " << static_cast<int>(msg.numExtensions) << "\n"
+                  << "  UnpairedQty: " << msg.unpairedQty << "\n"
+                  << "  UnpairedSide: " << msg.unpairedSide << "\n"
+                  << "  SignificantImbalance: " << msg.significantImbalance << "\n";
+}
+    void processAddOrderRefresh(const AddOrderRefreshMessage& msg, bool& top10Changed) {
+    addOrder(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, msg.orderID, msg.price, 
+             msg.volume, msg.side, std::string(msg.firmID, 5), top10Changed);
 
-    std::cout << "\nOrder Book (Top 10 Asks):\n";
-    int askCount = 0;
-    for (auto it = asks.begin(); it != asks.end() && askCount < 10; ++it, ++askCount) {
-        const auto& price = it->first;
-        const auto& orders = it->second;
-        std::cout << "Price " << price << ": ";
-        for (const auto& order : orders) {
-            std::cout << "[ID=" << order.orderID << ", Vol=" << order.volume << "] ";
+    std::cout << "Processed Add Order Refresh: \n"
+              << "  SourceTime: " << msg.sourceTime << "\n"
+              << "  SourceTimeNS: " << msg.sourceTimeNS << "\n"
+              << "  SymbolIndex: " << msg.symbolIndex << "\n"
+              << "  SymbolSeqNum: " << msg.symbolSeqNum << "\n"
+              << "  OrderID: " << msg.orderID << "\n"
+              << "  Price: " << msg.price << "\n"
+              << "  Volume: " << msg.volume << "\n"
+              << "  Side: " << (msg.side == 'B' ? "Buy" : "Sell") << "\n"
+              << "  FirmID: " << msg.firmID << "\n";
+}
+    void printOrderBook(uint32_t symbolIndex, const std::unordered_map<uint32_t, std::string>& symbolMappings) const {
+        auto symbolIt = symbolMappings.find(symbolIndex);
+        std::string symbolName = (symbolIt != symbolMappings.end()) ? symbolIt->second : "Unknown";
+
+        std::cout << "\nOrder Book for Symbol: " << symbolName << " (SymbolIndex: " << symbolIndex << ")\n";
+
+        std::cout << "Top 10 Bids:\n";
+        for (const auto& price : top10Bids) {
+            const auto& orders = bids.at(price);
+            std::cout << "Price " << price << ": ";
+            for (const auto& order : orders) {
+                std::cout << "[ID=" << order.orderID << ", Vol=" << order.volume << "] ";
+            }
+            std::cout << "\n";
         }
-        std::cout << "\n";
-    }
+
+        std::cout << "Top 10 Asks:\n";
+        for (const auto& price : top10Asks) {
+            const auto& orders = asks.at(price);
+            std::cout << "Price " << price << ": ";
+            for (const auto& order : orders) {
+                std::cout << "[ID=" << order.orderID << ", Vol=" << order.volume << "] ";
+            }
+            std::cout << "\n";
+        }
     }
 };
 
-// Instantiate a global order book
-OrderBook orderBook;
+// Global map of SymbolIndex to OrderBook
+std::unordered_map<uint32_t, OrderBook> symbolOrderBooks;
+uint32_t currentSymbolIndex = 0;
+std::unordered_map<uint32_t, std::string> symbolMappings;
+
+// Symbol Clear Order Function
+void symbolClear(uint32_t symbolIndex, 
+                 const std::unordered_map<uint32_t, std::string>& symbolMappings) {
+    auto it = symbolOrderBooks.find(symbolIndex);
+    if (it != symbolOrderBooks.end()) {
+        auto& orderBook = it->second;
+        orderBook.clearOrders();
+
+        auto symbolIt = symbolMappings.find(symbolIndex);
+        std::string symbolName = (symbolIt != symbolMappings.end()) ? symbolIt->second : "Unknown";
+
+        std::cout << "Cleared Order Book for Symbol: " << symbolName 
+                  << " (SymbolIndex: " << symbolIndex << ")\n";
+    } else {
+        std::cerr << "No order book found for SymbolIndex: " << symbolIndex << "\n";
+    }
+}
+
+// Add Order Function
+void addOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum, 
+              uint64_t orderID, uint32_t price, uint32_t volume, char side, 
+              const std::string& firmID) {
+    bool symbolChanged = (symbolIndex != currentSymbolIndex);
+    if (symbolChanged) {
+        currentSymbolIndex = symbolIndex;
+    }
+    
+    auto& orderBook = symbolOrderBooks[symbolIndex];
+
+    bool top10Changed = false;
+    orderBook.addOrder(sourceTimeNS, symbolIndex, symbolSeqNum, orderID, price, volume, side, firmID, top10Changed);
+
+    if (symbolChanged || top10Changed) {
+        orderBook.printOrderBook(symbolIndex, symbolMappings);
+    }
+}
+
+// Modify Order Function
+void modifyOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum,
+                 uint64_t orderID, uint32_t price, uint32_t volume,
+                 uint8_t positionChange, char side) {
+    bool symbolChanged = (symbolIndex != currentSymbolIndex);
+    if (symbolChanged) {
+        currentSymbolIndex = symbolIndex;
+    }
+
+    auto& orderBook = symbolOrderBooks[symbolIndex];
+
+    bool top10Changed = false;
+    orderBook.modifyOrder(sourceTimeNS, symbolIndex, symbolSeqNum, orderID, price, volume, positionChange, side, top10Changed);
+
+    if (symbolChanged || top10Changed) {
+        orderBook.printOrderBook(symbolIndex, symbolMappings);
+    }
+}
+
+// Order Execution Function
+void orderExecution(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum,
+                    uint64_t orderID, uint64_t tradeID, uint32_t price, uint32_t volume,
+                    uint8_t printableFlag, char tradeCond1, char tradeCond2, 
+                    char tradeCond3, char tradeCond4) {
+    bool symbolChanged = (symbolIndex != currentSymbolIndex);
+    if (symbolChanged) {
+        currentSymbolIndex = symbolIndex;
+    }
+
+    auto& orderBook = symbolOrderBooks[symbolIndex];
+
+    bool top10Changed = false;
+    orderBook.orderExecution(sourceTimeNS, symbolIndex, symbolSeqNum, orderID, tradeID, 
+                             price, volume, printableFlag, tradeCond1, tradeCond2, 
+                             tradeCond3, tradeCond4, top10Changed);
+
+    if (symbolChanged || top10Changed) {
+        orderBook.printOrderBook(symbolIndex, symbolMappings);
+    }
+}
+
+// Replace Order Function
+void replaceOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum, 
+                  uint64_t oldOrderID, uint64_t newOrderID, uint32_t price, 
+                  uint32_t volume, char side, 
+                  const std::unordered_map<uint32_t, std::string>& symbolMappings) {
+    bool symbolChanged = (symbolIndex != currentSymbolIndex);
+    if (symbolChanged) {
+        currentSymbolIndex = symbolIndex;
+    }
+
+    auto& orderBook = symbolOrderBooks[symbolIndex];
+
+    bool top10Changed = false;
+    orderBook.replaceOrder(sourceTimeNS, symbolIndex, symbolSeqNum, oldOrderID, newOrderID, price, volume, side, top10Changed);
+
+    if (symbolChanged || top10Changed) {
+        printOrderBook(symbolIndex, symbolMappings);
+    }
+}
+
+// Delete Order Function
+void deleteOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum, uint64_t orderID) {
+    bool symbolChanged = (symbolIndex != currentSymbolIndex);
+    if (symbolChanged) {
+        currentSymbolIndex = symbolIndex;
+    }
+    
+    auto& orderBook = symbolOrderBooks[symbolIndex];
+
+    bool top10Changed = false;
+    orderBook.deleteOrder(sourceTimeNS, symbolIndex, symbolSeqNum, orderID, top10Changed);
+
+    if (symbolChanged || top10Changed) {
+        orderBook.printOrderBook(symbolIndex, symbolMappings);
+    }
+}
+
+// Imbalance Order Function
+void handleImbalanceMessage(const ImbalanceMessage& msg) {
+    auto& orderBook = symbolOrderBooks[msg.symbolIndex];
+
+    auto symbolIt = symbolMappings.find(msg.symbolIndex);
+    std::string symbolName = (symbolIt != symbolMappings.end()) ? symbolIt->second : "Unknown";
+
+    std::cout << "Imbalance Message for Symbol: " << symbolName 
+              << " (SymbolIndex: " << msg.symbolIndex << ")\n";
+
+    orderBook.processImbalance(msg);
+}
+
+// Add Order Refresh Function
+void handleAddOrderRefreshMessage(const AddOrderRefreshMessage& msg) {
+    auto& orderBook = symbolOrderBooks[msg.symbolIndex];
+
+    auto symbolIt = symbolMappings.find(msg.symbolIndex);
+    std::string symbolName = (symbolIt != symbolMappings.end()) ? symbolIt->second : "Unknown";
+
+    bool top10Changed = false;
+    orderBook.processAddOrderRefresh(msg, top10Changed);
+
+    if (top10Changed) {
+        std::cout << "Updated Top 10 Orders for Symbol: " << symbolName 
+                  << " (SymbolIndex: " << msg.symbolIndex << ")\n";
+        orderBook.printOrderBook(msg.symbolIndex, symbolMappings);
+    }
+}
+
+// Print Order Book Function
+void printOrderBook(uint32_t symbolIndex, const std::unordered_map<uint32_t, std::string>& symbolMappings) {
+    auto it = symbolOrderBooks.find(symbolIndex);
+    if (it != symbolOrderBooks.end()) {
+        it->second.printOrderBook(symbolIndex, symbolMappings);
+    } else {
+        std::cerr << "Order book for SymbolIndex " << symbolIndex << " not found.\n";
+    }
+}
 
 // Function to convert MAC address to human-readable string
 std::string macToString(const uint8_t* mac) {
@@ -534,21 +847,66 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
                 return;
             }
             SymbolIndexMappingMessage msg;
-            std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Symbol Index Mapping: SymbolIndex=" << msg.symbolIndex
-                      << ", Symbol=" << std::string(msg.symbol, strnlen(msg.symbol, 11))
-                      << ", MarketID=" << msg.marketID
-                      << ", SystemID=" << static_cast<int>(msg.systemID)
-                      << ", ExchangeCode=" << msg.exchangeCode
-                      << ", PriceScaleCode=" << static_cast<int>(msg.priceScaleCode)
-                      << ", SecurityType=" << msg.securityType
-                      << ", LotSize=" << msg.lotSize
-                      << ", PrevClosePrice=" << msg.prevClosePrice
-                      << ", PrevCloseVolume=" << msg.prevCloseVolume
-                      << ", PriceResolution=" << static_cast<int>(msg.priceResolution)
-                      << ", RoundLot=" << msg.roundLot
-                      << ", MPV=" << msg.mpv
-                      << ", UnitOfTrade=" << msg.unitOfTrade << "\n";
+            
+            std::memcpy(&msg.symbolIndex, buffer, sizeof(msg.symbolIndex));
+            msg.symbolIndex = ntohl(msg.symbolIndex);
+
+            std::memcpy(msg.symbol, buffer + 4, sizeof(msg.symbol));
+            msg.symbol[10] = '\0';
+
+            msg.reserved1 = buffer[15];
+
+            std::memcpy(&msg.marketID, buffer + 16, sizeof(msg.marketID));
+            msg.marketID = ntohl(msg.marketID);
+
+            msg.systemID = buffer[18];
+
+            msg.exchangeCode = static_cast<char>(buffer[19]);
+
+            msg.priceScaleCode = buffer[20];
+
+            msg.securityType = static_cast<char>(buffer[21]);
+
+            std::memcpy(&msg.lotSize, buffer + 22, sizeof(msg.lotSize));
+            msg.lotSize = ntohl(msg.lotSize);
+
+            std::memcpy(&msg.prevClosePrice, buffer + 24, sizeof(msg.prevClosePrice));
+            msg.prevClosePrice = ntohl(msg.prevClosePrice);
+
+            std::memcpy(&msg.prevCloseVolume, buffer + 28, sizeof(msg.prevCloseVolume));
+            msg.prevCloseVolume = ntohl(msg.prevCloseVolume);
+
+            msg.priceResolution = buffer[32];
+
+            msg.roundLot = static_cast<char>(buffer[33]);
+
+            std::memcpy(&msg.mpv, buffer + 34, sizeof(msg.mpv));
+            msg.mpv = ntohl(msg.mpv);
+
+            std::memcpy(&msg.unitOfTrade, buffer + 36, sizeof(msg.unitOfTrade));
+            msg.unitOfTrade = ntohl(msg.unitOfTrade);
+
+            std::memcpy(&msg.reserved2, buffer + 38, sizeof(msg.reserved2));
+            msg.reserved2 = ntohl(msg.reserved2);
+
+            symbolMappings[msg.symbolIndex] = msg.symbol;
+
+            std::cout << "Symbol Index Mapping:\n"
+                      << "  SymbolIndex: " << msg.symbolIndex << "\n"
+                      << "  Symbol: " << msg.symbol << "\n"
+                      << "  MarketID: " << msg.marketID << "\n"
+                      << "  SystemID: " << msg.systemID << "\n"
+                      << "  ExchangeCode: " << msg.exchangeCode << "\n"
+                      << "  PriceScaleCode: " << msg.priceScaleCode << "\n"
+                      << "  SecurityType: " << msg.securityType << "\n"
+                      << "  LotSize: " << msg.lotSize << "\n"
+                      << "  PrevClosePrice: " << msg.prevClosePrice << "\n"
+                      << "  PrevCloseVolume: " << msg.prevCloseVolume << "\n"
+                      << "  PriceResolution: " << msg.priceResolution << "\n"
+                      << "  RoundLot: " << msg.roundLot << "\n"
+                      << "  MPV: " << msg.mpv << "\n"
+                      << "  UnitOfTrade: " << msg.unitOfTrade << "\n";
+
             break;
         }
         case MSG_TYPE_SYMBOL_CLEAR: {
@@ -557,11 +915,20 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
                 return;
             }
             SymbolClearMessage msg;
-            std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Symbol Clear: SourceTime=" << msg.sourceTime
-                      << ", SourceTimeNS=" << msg.sourceTimeNS
-                      << ", SymbolIndex=" << msg.symbolIndex
-                      << ", NextSourceSeqNum=" << msg.nextSourceSeqNum << "\n";
+            
+            std::memcpy(&msg.sourceTime, buffer, sizeof(msg.sourceTime));
+            msg.sourceTime = ntohl(msg.sourceTime);
+
+            std::memcpy(&msg.sourceTimeNS, buffer + 4, sizeof(msg.sourceTimeNS));
+            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
+
+            std::memcpy(&msg.symbolIndex, buffer + 8, sizeof(msg.symbolIndex));
+            msg.symbolIndex = ntohl(msg.symbolIndex);
+
+            std::memcpy(&msg.nextSourceSeqNum, buffer + 12, sizeof(msg.nextSourceSeqNum));
+            msg.nextSourceSeqNum = ntohl(msg.nextSourceSeqNum);
+
+            symbolClear(msg.symbolIndex, symbolMappings);
             break;
         }
         case MSG_TYPE_SECURITY_STATUS: {
@@ -627,7 +994,7 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             std::cout << "\n";
 
-            orderBook.addOrder(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, msg.orderID, msg.price, msg.volume, msg.side, msg.firmID);
+            addOrder(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, msg.orderID, msg.price, msg.volume, msg.side, msg.firmID);
             break;
         }
         case MSG_TYPE_MODIFY_ORDER: {
@@ -666,7 +1033,7 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             std::cout << "\n";
 
-            orderBook.modifyOrder(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, msg.orderID, msg.price, msg.volume, msg.positionChange, msg.side);
+            modifyOrder(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, msg.orderID, msg.price, msg.volume, msg.positionChange, msg.side);
             break;
         }
         case MSG_TYPE_DELETE_ORDER: {
@@ -697,7 +1064,7 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             }
             std::cout << "\n";
 
-            orderBook.deleteOrder(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, msg.orderID);
+            deleteOrder(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, msg.orderID);
             break;
         }
         case MSG_TYPE_ORDER_EXECUTION: {
@@ -706,21 +1073,42 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
                 return;
             }
             OrderExecutionMessage msg;
-            std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Order Execution: SourceTimeNS=" << msg.sourceTimeNS
-                      << ", SymbolIndex=" << msg.symbolIndex
-                      << ", SymbolSeqNum=" << msg.symbolSeqNum
-                      << ", OrderID=" << msg.orderID
-                      << ", TradeID=" << msg.tradeID
-                      << ", Price=" << msg.price
-                      << ", Volume=" << msg.volume
-                      << ", PrintableFlag=" << static_cast<int>(msg.printableFlag)
-                      << " (" << (msg.printableFlag == 0 ? "Not Printed to SIP" : "Printed to SIP")
-                      << ", Reserved1=" << static_cast<int>(msg.reserved1) << " (defaulted to 0)"
-                      << ", TradeCond1=" << msg.tradeCond1
-                      << ", TradeCond2=" << msg.tradeCond2
-                      << ", TradeCond3=" << msg.tradeCond3
-                      << ", TradeCond4=" << msg.tradeCond4 << "\n";
+
+            std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
+            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
+
+            std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
+            msg.symbolIndex = ntohl(msg.symbolIndex);
+
+            std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
+            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
+
+            std::memcpy(&msg.orderID, buffer + 12, sizeof(msg.orderID));
+            msg.orderID = __builtin_bswap64(msg.orderID);
+
+            std::memcpy(&msg.tradeID, buffer + 20, sizeof(msg.tradeID));
+            msg.tradeID = __builtin_bswap64(msg.tradeID);
+
+            std::memcpy(&msg.price, buffer + 28, sizeof(msg.price));
+            msg.price = ntohl(msg.price);
+
+            std::memcpy(&msg.volume, buffer + 32, sizeof(msg.volume));
+            msg.volume = ntohl(msg.volume);
+
+            msg.printableFlag = buffer[36];
+            msg.tradeCond1 = buffer[37];
+            msg.tradeCond2 = buffer[38];
+            msg.tradeCond3 = buffer[39];
+            msg.tradeCond4 = buffer[40];
+
+            // Debugging: Dump raw data
+            std::cout << "[Debug] Raw OrderExecutionMessage Data: ";
+            for (size_t i = 0; i < sizeof(msg); ++i) {
+                std::cout << std::bitset<8>(static_cast<unsigned long>(buffer[i])) << " ";
+            }
+            std::cout << "\n";
+
+            orderExecution(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, msg.orderID, msg.tradeID, msg.price, msg.volume, msg.printableFlag, msg.tradeCond1, msg.tradeCond2, msg.tradeCond3, msg.tradeCond4);
             break;
         }
         case MSG_TYPE_REPLACE_ORDER: {
@@ -729,17 +1117,42 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
                 return;
             }
             ReplaceOrderMessage msg;
-            std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Replace Order: SourceTimeNS=" << msg.sourceTimeNS
-                      << ", SymbolIndex=" << msg.symbolIndex
-                      << ", SymbolSeqNum=" << msg.symbolSeqNum
-                      << ", OrderID=" << msg.orderID
-                      << ", NewOrderID=" << msg.newOrderID
-                      << ", Price=" << msg.price
-                      << ", Volume=" << msg.volume
-                      << ", Side=" << msg.side
-                      << " (" << (msg.side == 'B' ? "Buy" : "Sell")
-                      << ", Reserved2=" << static_cast<int>(msg.reserved2) << " (defaulted to 0)\n";
+            
+            std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
+            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
+
+            std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
+            msg.symbolIndex = ntohl(msg.symbolIndex);
+
+            std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
+            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
+
+            std::memcpy(&msg.orderID, buffer + 12, sizeof(msg.orderID));
+            msg.orderID = __builtin_bswap64(msg.orderID);
+
+            std::memcpy(&msg.newOrderID, buffer + 20, sizeof(msg.newOrderID));
+            msg.newOrderID = __builtin_bswap64(msg.newOrderID);
+
+            std::memcpy(&msg.price, buffer + 28, sizeof(msg.price));
+            msg.price = ntohl(msg.price);
+
+            std::memcpy(&msg.volume, buffer + 32, sizeof(msg.volume));
+            msg.volume = ntohl(msg.volume);
+
+            msg.side = static_cast<char>(buffer[36]);
+
+            msg.reserved2 = buffer[37];
+
+            // Debugging: Dump raw data
+            std::cout << "[Debug] Raw ReplaceOrderMessage Data: ";
+            for (size_t i = 0; i < sizeof(msg); ++i) {
+                std::cout << std::bitset<8>(static_cast<unsigned long>(buffer[i])) << " ";
+            }
+            std::cout << "\n";
+
+            replaceOrder(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, 
+                         msg.orderID, msg.newOrderID, msg.price, msg.volume, 
+                         msg.side, symbolMappings);
             break;
         }
         case MSG_TYPE_IMBALANCE: {
@@ -748,30 +1161,69 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
                 return;
             }
             ImbalanceMessage msg;
-            std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Imbalance Message: SourceTime=" << msg.sourceTime
-                      << ", SourceTimeNS=" << msg.sourceTimeNS
-                      << ", SymbolIndex=" << msg.symbolIndex
-                      << ", SymbolSeqNum=" << msg.symbolSeqNum
-                      << ", ReferencePrice=" << msg.referencePrice
-                      << ", PairedQty=" << msg.pairedQty
-                      << ", TotalImbalanceQty=" << msg.totalImbalanceQty
-                      << ", MarketImbalanceQty=" << msg.marketImbalanceQty
-                      << ", AuctionTime=" << msg.auctionTime
-                      << ", AuctionType=" << msg.auctionType
-                      << ", ImbalanceSide=" << msg.imbalanceSide
-                      << ", ContinuousBookClearingPrice=" << msg.continuousBookClearingPrice
-                      << ", AuctionInterestClearingPrice=" << msg.auctionInterestClearingPrice
-                      << ", SSRFilingPrice=" << msg.ssrFilingPrice
-                      << ", IndicativeMatchPrice=" << msg.indicativeMatchPrice
-                      << ", UpperCollar=" << msg.upperCollar
-                      << ", LowerCollar=" << msg.lowerCollar
-                      << ", AuctionStatus=" << static_cast<int>(msg.auctionStatus)
-                      << ", FreezeStatus=" << static_cast<int>(msg.freezeStatus)
-                      << ", NumExtensions=" << static_cast<int>(msg.numExtensions)
-                      << ", UnpairedQty=" << msg.unpairedQty
-                      << ", UnpairedSide=" << msg.unpairedSide
-                      << ", SignificantImbalance=" << msg.significantImbalance << "\n";
+            
+            std::memcpy(&msg.sourceTime, buffer, sizeof(msg.sourceTime));
+            msg.sourceTime = ntohl(msg.sourceTime);
+
+            std::memcpy(&msg.sourceTimeNS, buffer + 4, sizeof(msg.sourceTimeNS));
+            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
+
+            std::memcpy(&msg.symbolIndex, buffer + 8, sizeof(msg.symbolIndex));
+            msg.symbolIndex = ntohl(msg.symbolIndex);
+
+            std::memcpy(&msg.symbolSeqNum, buffer + 12, sizeof(msg.symbolSeqNum));
+            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
+
+            std::memcpy(&msg.referencePrice, buffer + 16, sizeof(msg.referencePrice));
+            msg.referencePrice = ntohl(msg.referencePrice);
+
+            std::memcpy(&msg.pairedQty, buffer + 20, sizeof(msg.pairedQty));
+            msg.pairedQty = ntohl(msg.pairedQty);
+
+            std::memcpy(&msg.totalImbalanceQty, buffer + 24, sizeof(msg.totalImbalanceQty));
+            msg.totalImbalanceQty = ntohl(msg.totalImbalanceQty);
+
+            std::memcpy(&msg.marketImbalanceQty, buffer + 28, sizeof(msg.marketImbalanceQty));
+            msg.marketImbalanceQty = ntohl(msg.marketImbalanceQty);
+
+            msg.auctionTime = ntohs(*(reinterpret_cast<const uint16_t*>(buffer + 32)));
+            
+            msg.auctionType = buffer[34];
+            
+            msg.imbalanceSide = buffer[35];
+
+            std::memcpy(&msg.continuousBookClearingPrice, buffer + 36, sizeof(msg.continuousBookClearingPrice));
+            msg.continuousBookClearingPrice = ntohl(msg.continuousBookClearingPrice);
+
+            std::memcpy(&msg.auctionInterestClearingPrice, buffer + 40, sizeof(msg.auctionInterestClearingPrice));
+            msg.auctionInterestClearingPrice = ntohl(msg.auctionInterestClearingPrice);
+
+            std::memcpy(&msg.ssrFilingPrice, buffer + 44, sizeof(msg.ssrFilingPrice));
+            msg.ssrFilingPrice = ntohl(msg.ssrFilingPrice);
+
+            std::memcpy(&msg.indicativeMatchPrice, buffer + 48, sizeof(msg.indicativeMatchPrice));
+            msg.indicativeMatchPrice = ntohl(msg.indicativeMatchPrice);
+
+            std::memcpy(&msg.upperCollar, buffer + 52, sizeof(msg.upperCollar));
+            msg.upperCollar = ntohl(msg.upperCollar);
+
+            std::memcpy(&msg.lowerCollar, buffer + 56, sizeof(msg.lowerCollar));
+            msg.lowerCollar = ntohl(msg.lowerCollar);
+
+            msg.auctionStatus = buffer[60];
+    
+            msg.freezeStatus = buffer[61];
+            
+            msg.numExtensions = buffer[62];
+
+            std::memcpy(&msg.unpairedQty, buffer + 64, sizeof(msg.unpairedQty));
+            msg.unpairedQty = ntohl(msg.unpairedQty);
+
+            msg.unpairedSide = buffer[68];
+    
+            msg.significantImbalance = buffer[69];
+
+            handleImbalanceMessage(msg);
             break;
         }
         case MSG_TYPE_ADD_ORDER_REFRESH: {
@@ -780,18 +1232,36 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
                 return;
             }
             AddOrderRefreshMessage msg;
-            std::memcpy(&msg, buffer, sizeof(msg));
-            std::cout << "Add Order Refresh: SourceTime=" << msg.sourceTime
-                      << ", SourceTimeNS=" << msg.sourceTimeNS
-                      << ", SymbolIndex=" << msg.symbolIndex
-                      << ", SymbolSeqNum=" << msg.symbolSeqNum
-                      << ", OrderID=" << msg.orderID
-                      << ", Price=" << msg.price
-                      << ", Volume=" << msg.volume
-                      << ", Side=" << msg.side
-                      << " (" << (msg.side == 'B' ? "Buy" : "Sell")
-                      << ", FirmID=" << std::string(msg.firmID, strnlen(msg.firmID, 5))
-                      << ", Reserved1=" << static_cast<int>(msg.reserved1) << " (defaulted to 0)\n";
+            
+            std::memcpy(&msg.sourceTime, buffer, sizeof(msg.sourceTime));
+            msg.sourceTime = ntohl(msg.sourceTime);
+
+            std::memcpy(&msg.sourceTimeNS, buffer + 4, sizeof(msg.sourceTimeNS));
+            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
+
+            std::memcpy(&msg.symbolIndex, buffer + 8, sizeof(msg.symbolIndex));
+            msg.symbolIndex = ntohl(msg.symbolIndex);
+
+            std::memcpy(&msg.symbolSeqNum, buffer + 12, sizeof(msg.symbolSeqNum));
+            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
+
+            std::memcpy(&msg.orderID, buffer + 16, sizeof(msg.orderID));
+            msg.orderID = __builtin_bswap64(msg.orderID);
+
+            std::memcpy(&msg.price, buffer + 24, sizeof(msg.price));
+            msg.price = ntohl(msg.price);
+
+            std::memcpy(&msg.volume, buffer + 28, sizeof(msg.volume));
+            msg.volume = ntohl(msg.volume);
+
+            msg.side = static_cast<char>(buffer[32]);
+
+            std::memcpy(msg.firmID, buffer + 33, sizeof(msg.firmID));
+            msg.firmID[4] = '\0';
+
+            msg.reserved1 = buffer[38];
+
+            handleAddOrderRefreshMessage(msg);
             break;
         }
         case MSG_TYPE_NON_DISPLAYED_TRADE: {
@@ -1035,8 +1505,6 @@ int main(int argc, char* argv[]) {
         const uint8_t* pillarData = packet_data + udpPayloadOffset;
         uint16_t pillarLength = udpPayloadLength;
         parsePillarStream(pillarData, pillarLength);
-
-        orderBook.printOrderBook();
     }
 
     pcap_close(handle);
