@@ -8,6 +8,8 @@
 #include <cstring>
 #include <cstdint>
 #include <arpa/inet.h>
+#include <bitset>
+#include <algorithm>
 
 #pragma pack(push, 1)
 
@@ -21,6 +23,10 @@ struct Order {
 
     Order(uint64_t id, uint32_t p, uint32_t v, char s, const std::string& f)
         : orderID(id), price(p), volume(v), side(s), firmID(f) {}
+    
+    bool operator==(const Order& other) const {
+        return orderID == other.orderID;
+    }
 };
 
 // Ethernet Header Definition
@@ -99,17 +105,17 @@ constexpr uint16_t MSG_TYPE_RETAIL_PRICE_IMPROVEMENT = 114;
 
 // Sequence Number Reset Message (Msg Type 1)
 struct SequenceNumberResetMessage : PillarMessageHeader {
-    uint64_t sourceTime;
+    uint32_t sourceTime;
     uint32_t sourceTimeNS;
-    uint16_t productID;
-    uint16_t channelID;
+    uint8_t productID;
+    uint8_t channelID;
 };
 
 // Source Time Reference Message (Msg Type 2)
 struct SourceTimeReferenceMessage : PillarMessageHeader {
-    uint16_t id;
+    uint32_t id;
     uint32_t symbolSeqNum;
-    uint64_t sourceTime;
+    uint32_t sourceTime;
 };
 
 // Symbol Index Mapping Message (Msg Type 3)
@@ -121,7 +127,7 @@ struct SymbolIndexMappingMessage : PillarMessageHeader {
     uint8_t systemID;
     char exchangeCode;
     uint8_t priceScaleCode;
-    uint8_t securityType;
+    char securityType;
     uint16_t lotSize;
     uint32_t prevClosePrice;
     uint32_t prevCloseVolume;
@@ -134,7 +140,7 @@ struct SymbolIndexMappingMessage : PillarMessageHeader {
 
 // Symbol Clear Message (Msg Type 32)
 struct SymbolClearMessage : PillarMessageHeader {
-    uint64_t sourceTime;
+    uint32_t sourceTime;
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
     uint32_t nextSourceSeqNum;
@@ -160,7 +166,7 @@ struct SecurityStatusMessage : PillarMessageHeader {
 };
 
 // Add Order Message (Msg Type 100)
-struct AddOrderMessage : PillarMessageHeader {
+struct AddOrderMessage {
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
     uint32_t symbolSeqNum;
@@ -200,7 +206,7 @@ struct OrderExecutionMessage : PillarMessageHeader {
     uint32_t symbolIndex;
     uint32_t symbolSeqNum;
     uint64_t orderID;
-    uint64_t tradeID;
+    uint32_t tradeID;
     uint32_t price;
     uint32_t volume;
     uint8_t printableFlag;
@@ -270,7 +276,7 @@ struct NonDisplayedTradeMessage : PillarMessageHeader {
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
     uint32_t symbolSeqNum;
-    uint64_t tradeID;
+    uint32_t tradeID;
     uint32_t price;
     uint32_t volume;
     uint8_t printableFlag;
@@ -296,7 +302,7 @@ struct TradeCancelMessage : PillarMessageHeader {
     uint32_t sourceTimeNS;
     uint32_t symbolIndex;
     uint32_t symbolSeqNum;
-    uint64_t tradeID;
+    uint32_t tradeID;
 };
 
 // Cross Correction Message (Msg Type 113)
@@ -325,31 +331,49 @@ private:
     std::map<uint32_t, std::list<Order>> asks;   
 
 public:
-    void addOrder(const AddOrderMessage& msg) {
-        Order newOrder(msg.orderID, msg.price, msg.volume, msg.side, std::string(msg.firmID, 5));
-        auto& bookSide = (msg.side == 'B') ? bids : asks;
+    void addOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum, 
+                  uint64_t orderID, uint32_t price, uint32_t volume, char side, 
+                  const std::string& firmID) {
+        Order newOrder(orderID, price, volume, side, firmID);
+        auto& bookSide = (side == 'B') ? bids : asks;
 
-        bookSide[msg.price].push_back(newOrder);
-        orderMap[msg.orderID] = &bookSide[msg.price].back();
+        bookSide[price].push_back(newOrder);
+        orderMap[orderID] = &bookSide[price].back();
 
-        std::cout << "Added Order: ID=" << msg.orderID << ", Price=" << msg.price
-                  << ", Volume=" << msg.volume << ", Side=" << (msg.side == 'B' ? "Buy" : "Sell") << "\n";
+        std::cout << "Added Order: \n"
+                  << "  SourceTimeNS: " << sourceTimeNS << "\n"
+                  << "  SymbolIndex: " << symbolIndex << "\n"
+                  << "  SymbolSeqNum: " << symbolSeqNum << "\n"
+                  << "  OrderID: " << orderID << "\n"
+                  << "  Price: " << price << "\n"
+                  << "  Volume: " << volume << "\n"
+                  << "  Side: " << (side == 'B' ? "Buy" : "Sell") << "\n"
+                  << "  FirmID: " << firmID << "\n";
     }
-    void modifyOrder(const ModifyOrderMessage& msg) {
-        auto it = orderMap.find(msg.orderID);
+    void modifyOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum,
+                     uint64_t orderID, uint32_t price, uint32_t volume,
+                     uint8_t positionChange, char side) {
+        auto it = orderMap.find(orderID);
         
         if (it != orderMap.end()) {
             Order* order = it->second;
-            std::cout << "Modifying Order: ID=" << order->orderID << "\n";
-            order->price = msg.price;
-            order->volume = msg.volume;
-            order->side = msg.side;
+
+            std::cout << "Modifying Order:\n"
+                      << "  Current State -> ID: " << order->orderID << ", Price: " << order->price
+                      << ", Volume: " << order->volume << ", Side: " << (order->side == 'B' ? "Buy" : "Sell") << "\n";
+
+            order->price = price;
+            order->volume = volume;
+            order->side = side;
+
+            std::cout << "  Modified State -> ID: " << order->orderID << ", Price: " << order->price
+                      << ", Volume: " << order->volume << ", Side: " << (order->side == 'B' ? "Buy" : "Sell") << "\n";
         } else {
-            std::cerr << "Order ID " << msg.orderID << " not found for modification\n";
+            std::cerr << "Order ID " << orderID << " not found for modification\n";
         }
     }
-    void deleteOrder(const DeleteOrderMessage& msg) {
-        auto it = orderMap.find(msg.orderID);
+    void deleteOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum, uint64_t orderID) {
+        auto it = orderMap.find(orderID);
         
         if (it != orderMap.end()) {
             Order* order = it->second;
@@ -357,38 +381,59 @@ public:
 
             auto levelIt = bookSide.find(order->price);
             if (levelIt != bookSide.end()) {
-                levelIt->second.remove(*order);
+                auto& orderList = levelIt->second;
+
+                auto orderInList = std::find_if(orderList.begin(), orderList.end(),
+                    [&](const Order& o) { return o.orderID == order->orderID; });
                 
-                if (levelIt->second.empty()) {
-                    bookSide.erase(levelIt);
+                if (orderInList != orderList.end()) {
+                    orderList.erase(orderInList);
+
+                    if (orderList.empty()) {
+                        bookSide.erase(levelIt);
+                    }
+                } else {
+                    std::cerr << "Order not found in price level for deletion: ID=" << orderID << "\n";
                 }
+            } else {
+                std::cerr << "Price level not found for order deletion: Price=" << order->price << "\n";
             }
 
             orderMap.erase(it);
 
-            std::cout << "Deleted Order: ID=" << msg.orderID << "\n";
+            std::cout << "Deleted Order: \n"
+                      << "  SourceTimeNS: " << sourceTimeNS << "\n"
+                      << "  SymbolIndex: " << symbolIndex << "\n"
+                      << "  SymbolSeqNum: " << symbolSeqNum << "\n"
+                      << "  OrderID: " << orderID << "\n";
         } else {
-            std::cerr << "Order ID " << msg.orderID << " not found for deletion\n";
+            std::cerr << "Order ID " << orderID << " not found for deletion\n";
         }
     }
     void printOrderBook() const {
-        std::cout << "\nOrder Book (Bids):\n";
-        for (const auto& [price, orders] : bids) {
-            std::cout << "Price " << price << ": ";
-            for (const auto& order : orders) {
-                std::cout << "[ID=" << order.orderID << ", Vol=" << order.volume << "] ";
-            }
-            std::cout << "\n";
+    std::cout << "\nOrder Book (Top 10 Bids):\n";
+    int bidCount = 0;
+    for (auto it = bids.rbegin(); it != bids.rend() && bidCount < 10; ++it, ++bidCount) {
+        const auto& price = it->first;
+        const auto& orders = it->second;
+        std::cout << "Price " << price << ": ";
+        for (const auto& order : orders) {
+            std::cout << "[ID=" << order.orderID << ", Vol=" << order.volume << "] ";
         }
+        std::cout << "\n";
+    }
 
-        std::cout << "\nOrder Book (Asks):\n";
-        for (const auto& [price, orders] : asks) {
-            std::cout << "Price " << price << ": ";
-            for (const auto& order : orders) {
-                std::cout << "[ID=" << order.orderID << ", Vol=" << order.volume << "] ";
-            }
-            std::cout << "\n";
+    std::cout << "\nOrder Book (Top 10 Asks):\n";
+    int askCount = 0;
+    for (auto it = asks.begin(); it != asks.end() && askCount < 10; ++it, ++askCount) {
+        const auto& price = it->first;
+        const auto& orders = it->second;
+        std::cout << "Price " << price << ": ";
+        for (const auto& order : orders) {
+            std::cout << "[ID=" << order.orderID << ", Vol=" << order.volume << "] ";
         }
+        std::cout << "\n";
+    }
     }
 };
 
@@ -412,7 +457,7 @@ bool parseEthernetHeader(const u_char* data, mac_hdr_t& eth_header) {
 
     std::cout << "[Ethernet Header] Dest MAC: " << macToString(eth_header.dest_mac)
               << ", Src MAC: " << macToString(eth_header.src_mac)
-              << ", Ethertype (Binary): " << std::bitset<16>(eth_header.ethertype) << std::endl;
+              << ", Ethertype (Binary): " << std::bitset<16>(static_cast<unsigned long>(eth_header.ethertype)) << std::endl;
 
     return true;
 }
@@ -549,16 +594,40 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
                 return;
             }
             AddOrderMessage msg;
-            std::memcpy(&msg, buffer, sizeof(msg));
+
+            std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
+            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
+
+            std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
+            msg.symbolIndex = ntohl(msg.symbolIndex);
+
+            std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
+            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
+
+            std::memcpy(&msg.orderID, buffer + 12, sizeof(msg.orderID));
+            msg.orderID = __builtin_bswap64(msg.orderID);
+
+            std::memcpy(&msg.price, buffer + 20, sizeof(msg.price));
+            msg.price = ntohl(msg.price);
+
+            std::memcpy(&msg.volume, buffer + 24, sizeof(msg.volume));
+            msg.volume = ntohl(msg.volume);
+
+            msg.side = static_cast<char>(buffer[28]);
+
+            std::memcpy(msg.firmID, buffer + 29, sizeof(msg.firmID));
+            msg.firmID[4] = '\0';
+
+            msg.reserved1 = buffer[34];
 
             // Debugging: Dump raw data
             std::cout << "[Debug] Raw AddOrderMessage Data (Binary): ";
             for (size_t i = 0; i < sizeof(msg); ++i) {
-                std::cout << std::bitset<8>(buffer[i]) << " ";
+                std::cout << std::bitset<8>(static_cast<unsigned long>(buffer[i])) << " ";
             }
             std::cout << "\n";
 
-            orderBook.addOrder(msg);
+            orderBook.addOrder(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, msg.orderID, msg.price, msg.volume, msg.side, msg.firmID);
             break;
         }
         case MSG_TYPE_MODIFY_ORDER: {
@@ -567,16 +636,37 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
                 return;
             }
             ModifyOrderMessage msg;
-            std::memcpy(&msg, buffer, sizeof(msg));
+
+            std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
+            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
+
+            std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
+            msg.symbolIndex = ntohl(msg.symbolIndex);
+
+            std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
+            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
+
+            std::memcpy(&msg.orderID, buffer + 12, sizeof(msg.orderID));
+            msg.orderID = __builtin_bswap64(msg.orderID);
+
+            std::memcpy(&msg.price, buffer + 20, sizeof(msg.price));
+            msg.price = ntohl(msg.price);
+
+            std::memcpy(&msg.volume, buffer + 24, sizeof(msg.volume));
+            msg.volume = ntohl(msg.volume);
+
+            msg.positionChange = buffer[28];
+            msg.side = static_cast<char>(buffer[29]);
+            msg.reserved2 = buffer[30];
 
             // Debugging: Dump raw data
             std::cout << "[Debug] Raw ModifyOrderMessage Data: ";
             for (size_t i = 0; i < sizeof(msg); ++i) {
-                std::cout << std::bitset<8>(buffer[i]) << " ";
+                std::cout << std::bitset<8>(static_cast<unsigned long>(buffer[i])) << " ";
             }
             std::cout << "\n";
 
-            orderBook.modifyOrder(msg);
+            orderBook.modifyOrder(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, msg.orderID, msg.price, msg.volume, msg.positionChange, msg.side);
             break;
         }
         case MSG_TYPE_DELETE_ORDER: {
@@ -585,16 +675,29 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
                 return;
             }
             DeleteOrderMessage msg;
-            std::memcpy(&msg, buffer, sizeof(msg));
+            
+            std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
+            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
+
+            std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
+            msg.symbolIndex = ntohl(msg.symbolIndex);
+
+            std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
+            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
+
+            std::memcpy(&msg.orderID, buffer + 12, sizeof(msg.orderID));
+            msg.orderID = __builtin_bswap64(msg.orderID);
+
+            msg.reserved1 = buffer[20];
 
             // Debugging: Dump raw data
             std::cout << "[Debug] Raw DeleteOrderMessage Data: ";
             for (size_t i = 0; i < sizeof(msg); ++i) {
-                std::cout << std::bitset<8>(buffer[i]) << " ";
+                std::cout << std::bitset<8>(static_cast<unsigned long>(buffer[i])) << " ";
             }
             std::cout << "\n";
 
-            orderBook.deleteOrder(msg);
+            orderBook.deleteOrder(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, msg.orderID);
             break;
         }
         case MSG_TYPE_ORDER_EXECUTION: {
@@ -814,7 +917,7 @@ void parsePillarStream(const uint8_t* data, uint16_t length) {
     }
 
     // Start parsing messages
-    const uint8_t* messagePtr = data + 16; // Skip 16-byte Packet Header
+    const uint8_t* messagePtr = data + 16;
     uint16_t bytesProcessed = 16;
 
     for (uint8_t i = 0; i < numberOfMessages; ++i) {
@@ -839,8 +942,8 @@ void parsePillarStream(const uint8_t* data, uint16_t length) {
         std::cout << "\n";
 
         std::cout << "[Debug] Raw Message Size Bytes (Binary): " 
-                  << std::bitset<8>(messagePtr[0]) << " " 
-                  << std::bitset<8>(messagePtr[1]) << "\n";
+                  << std::bitset<8>(static_cast<unsigned long>(messagePtr[0])) << " " 
+                  << std::bitset<8>(static_cast<unsigned long>(messagePtr[1])) << "\n";
 
         std::cout << "[Debug] Message Size (before validation): " << msgSize << "\n";
         std::cout << "[Message Header] Message Type: " << msgType
@@ -933,6 +1036,7 @@ int main(int argc, char* argv[]) {
         uint16_t pillarLength = udpPayloadLength;
         parsePillarStream(pillarData, pillarLength);
 
+        orderBook.printOrderBook();
     }
 
     pcap_close(handle);
