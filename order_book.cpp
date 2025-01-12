@@ -723,10 +723,8 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             SequenceNumberResetMessage msg;
             
             std::memcpy(&msg.sourceTime, buffer, sizeof(msg.sourceTime));
-            msg.sourceTime = ntohl(msg.sourceTime);
 
             std::memcpy(&msg.sourceTimeNS, buffer + 4, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             msg.productID = buffer[8];
 
@@ -743,13 +741,10 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             SourceTimeReferenceMessage msg;
             
             std::memcpy(&msg.id, buffer, sizeof(msg.id));
-            msg.id = ntohl(msg.id);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 4, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             std::memcpy(&msg.sourceTime, buffer + 8, sizeof(msg.sourceTime));
-            msg.sourceTime = ntohl(msg.sourceTime);
 
             std::cout << "Source Time Reference Message Processed.\n";
 
@@ -763,7 +758,6 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             SymbolIndexMappingMessage msg;
             
             std::memcpy(&msg.symbolIndex, buffer, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(msg.symbol, buffer + 4, sizeof(msg.symbol));
             msg.symbol[10] = '\0';
@@ -771,7 +765,6 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             msg.reserved1 = buffer[15];
 
             std::memcpy(&msg.marketID, buffer + 16, sizeof(msg.marketID));
-            msg.marketID = ntohl(msg.marketID);
 
             msg.systemID = buffer[18];
 
@@ -782,26 +775,20 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             msg.securityType = static_cast<char>(buffer[21]);
 
             std::memcpy(&msg.lotSize, buffer + 22, sizeof(msg.lotSize));
-            msg.lotSize = ntohl(msg.lotSize);
 
             std::memcpy(&msg.prevClosePrice, buffer + 24, sizeof(msg.prevClosePrice));
-            msg.prevClosePrice = ntohl(msg.prevClosePrice);
 
             std::memcpy(&msg.prevCloseVolume, buffer + 28, sizeof(msg.prevCloseVolume));
-            msg.prevCloseVolume = ntohl(msg.prevCloseVolume);
 
             msg.priceResolution = buffer[32];
 
             msg.roundLot = static_cast<char>(buffer[33]);
 
             std::memcpy(&msg.mpv, buffer + 34, sizeof(msg.mpv));
-            msg.mpv = ntohl(msg.mpv);
 
             std::memcpy(&msg.unitOfTrade, buffer + 36, sizeof(msg.unitOfTrade));
-            msg.unitOfTrade = ntohl(msg.unitOfTrade);
 
             std::memcpy(&msg.reserved2, buffer + 38, sizeof(msg.reserved2));
-            msg.reserved2 = ntohl(msg.reserved2);
 
             // Check if the symbolIndex exists, if not add it
             if (symbolMappings.find(msg.symbolIndex) == symbolMappings.end()) {
@@ -820,16 +807,12 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             SymbolClearMessage msg;
             
             std::memcpy(&msg.sourceTime, buffer, sizeof(msg.sourceTime));
-            msg.sourceTime = ntohl(msg.sourceTime);
 
             std::memcpy(&msg.sourceTimeNS, buffer + 4, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 8, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.nextSourceSeqNum, buffer + 12, sizeof(msg.nextSourceSeqNum));
-            msg.nextSourceSeqNum = ntohl(msg.nextSourceSeqNum);
 
             symbolClear(msg.symbolIndex, symbolMappings);
             break;
@@ -842,37 +825,28 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             SecurityStatusMessage msg;
             
             std::memcpy(&msg.sourceTime, buffer, sizeof(msg.sourceTime));
-            msg.sourceTime = ntohl(msg.sourceTime);
 
             std::memcpy(&msg.sourceTimeNS, buffer + 4, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 8, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 12, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             msg.securityStatus = static_cast<char>(buffer[16]);
 
             msg.haltCondition = static_cast<char>(buffer[17]);
 
             std::memcpy(&msg.reserved, buffer + 18, sizeof(msg.reserved));
-            msg.reserved = ntohl(msg.reserved);
 
             std::memcpy(&msg.price1, buffer + 22, sizeof(msg.price1));
-            msg.price1 = ntohl(msg.price1);
 
             std::memcpy(&msg.price2, buffer + 26, sizeof(msg.price2));
-            msg.price2 = ntohl(msg.price2);
 
             msg.ssrTriggeringExchangeID = static_cast<char>(buffer[30]);
 
             std::memcpy(&msg.ssrTriggeringVolume, buffer + 31, sizeof(msg.ssrTriggeringVolume));
-            msg.ssrTriggeringVolume = ntohl(msg.ssrTriggeringVolume);
 
             std::memcpy(&msg.time, buffer + 35, sizeof(msg.time));
-            msg.time = ntohl(msg.time);
 
             msg.ssrState = static_cast<char>(buffer[39]);
 
@@ -891,22 +865,16 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             AddOrderMessage msg;
 
             std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             std::memcpy(&msg.orderID, buffer + 12, sizeof(msg.orderID));
-            msg.orderID = __builtin_bswap64(msg.orderID);
 
             std::memcpy(&msg.price, buffer + 20, sizeof(msg.price));
-            msg.price = ntohl(msg.price);
 
             std::memcpy(&msg.volume, buffer + 24, sizeof(msg.volume));
-            msg.volume = ntohl(msg.volume);
 
             msg.side = static_cast<char>(buffer[28]);
 
@@ -926,25 +894,21 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             ModifyOrderMessage msg;
 
             std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             std::memcpy(&msg.orderID, buffer + 12, sizeof(msg.orderID));
-            msg.orderID = __builtin_bswap64(msg.orderID);
 
             std::memcpy(&msg.price, buffer + 20, sizeof(msg.price));
-            msg.price = ntohl(msg.price);
 
             std::memcpy(&msg.volume, buffer + 24, sizeof(msg.volume));
-            msg.volume = ntohl(msg.volume);
 
             msg.positionChange = buffer[28];
+
             msg.side = static_cast<char>(buffer[29]);
+
             msg.reserved2 = buffer[30];
 
             modifyOrder(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, msg.orderID, msg.price, msg.volume, msg.positionChange, msg.side);
@@ -958,16 +922,12 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             DeleteOrderMessage msg;
             
             std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             std::memcpy(&msg.orderID, buffer + 12, sizeof(msg.orderID));
-            msg.orderID = __builtin_bswap64(msg.orderID);
 
             msg.reserved1 = buffer[20];
 
@@ -982,30 +942,27 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             OrderExecutionMessage msg;
 
             std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             std::memcpy(&msg.orderID, buffer + 12, sizeof(msg.orderID));
-            msg.orderID = __builtin_bswap64(msg.orderID);
 
             std::memcpy(&msg.tradeID, buffer + 20, sizeof(msg.tradeID));
-            msg.tradeID = __builtin_bswap64(msg.tradeID);
 
             std::memcpy(&msg.price, buffer + 28, sizeof(msg.price));
-            msg.price = ntohl(msg.price);
 
             std::memcpy(&msg.volume, buffer + 32, sizeof(msg.volume));
-            msg.volume = ntohl(msg.volume);
 
             msg.printableFlag = buffer[36];
+
             msg.tradeCond1 = buffer[37];
+            
             msg.tradeCond2 = buffer[38];
+            
             msg.tradeCond3 = buffer[39];
+            
             msg.tradeCond4 = buffer[40];
 
             orderExecution(msg.sourceTimeNS, msg.symbolIndex, msg.symbolSeqNum, msg.orderID, msg.tradeID, msg.price, msg.volume, msg.printableFlag, msg.tradeCond1, msg.tradeCond2, msg.tradeCond3, msg.tradeCond4);
@@ -1019,25 +976,18 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             ReplaceOrderMessage msg;
             
             std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             std::memcpy(&msg.orderID, buffer + 12, sizeof(msg.orderID));
-            msg.orderID = __builtin_bswap64(msg.orderID);
 
             std::memcpy(&msg.newOrderID, buffer + 20, sizeof(msg.newOrderID));
-            msg.newOrderID = __builtin_bswap64(msg.newOrderID);
 
             std::memcpy(&msg.price, buffer + 28, sizeof(msg.price));
-            msg.price = ntohl(msg.price);
 
             std::memcpy(&msg.volume, buffer + 32, sizeof(msg.volume));
-            msg.volume = ntohl(msg.volume);
 
             msg.side = static_cast<char>(buffer[36]);
 
@@ -1056,28 +1006,20 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             ImbalanceMessage msg;
             
             std::memcpy(&msg.sourceTime, buffer, sizeof(msg.sourceTime));
-            msg.sourceTime = ntohl(msg.sourceTime);
 
             std::memcpy(&msg.sourceTimeNS, buffer + 4, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 8, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 12, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             std::memcpy(&msg.referencePrice, buffer + 16, sizeof(msg.referencePrice));
-            msg.referencePrice = ntohl(msg.referencePrice);
 
             std::memcpy(&msg.pairedQty, buffer + 20, sizeof(msg.pairedQty));
-            msg.pairedQty = ntohl(msg.pairedQty);
 
             std::memcpy(&msg.totalImbalanceQty, buffer + 24, sizeof(msg.totalImbalanceQty));
-            msg.totalImbalanceQty = ntohl(msg.totalImbalanceQty);
 
             std::memcpy(&msg.marketImbalanceQty, buffer + 28, sizeof(msg.marketImbalanceQty));
-            msg.marketImbalanceQty = ntohl(msg.marketImbalanceQty);
 
             msg.auctionTime = ntohs(*(reinterpret_cast<const uint16_t*>(buffer + 32)));
             
@@ -1086,22 +1028,16 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             msg.imbalanceSide = buffer[35];
 
             std::memcpy(&msg.continuousBookClearingPrice, buffer + 36, sizeof(msg.continuousBookClearingPrice));
-            msg.continuousBookClearingPrice = ntohl(msg.continuousBookClearingPrice);
 
             std::memcpy(&msg.auctionInterestClearingPrice, buffer + 40, sizeof(msg.auctionInterestClearingPrice));
-            msg.auctionInterestClearingPrice = ntohl(msg.auctionInterestClearingPrice);
 
             std::memcpy(&msg.ssrFilingPrice, buffer + 44, sizeof(msg.ssrFilingPrice));
-            msg.ssrFilingPrice = ntohl(msg.ssrFilingPrice);
 
             std::memcpy(&msg.indicativeMatchPrice, buffer + 48, sizeof(msg.indicativeMatchPrice));
-            msg.indicativeMatchPrice = ntohl(msg.indicativeMatchPrice);
 
             std::memcpy(&msg.upperCollar, buffer + 52, sizeof(msg.upperCollar));
-            msg.upperCollar = ntohl(msg.upperCollar);
 
             std::memcpy(&msg.lowerCollar, buffer + 56, sizeof(msg.lowerCollar));
-            msg.lowerCollar = ntohl(msg.lowerCollar);
 
             msg.auctionStatus = buffer[60];
     
@@ -1110,7 +1046,6 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             msg.numExtensions = buffer[62];
 
             std::memcpy(&msg.unpairedQty, buffer + 64, sizeof(msg.unpairedQty));
-            msg.unpairedQty = ntohl(msg.unpairedQty);
 
             msg.unpairedSide = buffer[68];
     
@@ -1127,25 +1062,18 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             AddOrderRefreshMessage msg;
             
             std::memcpy(&msg.sourceTime, buffer, sizeof(msg.sourceTime));
-            msg.sourceTime = ntohl(msg.sourceTime);
 
             std::memcpy(&msg.sourceTimeNS, buffer + 4, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 8, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 12, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             std::memcpy(&msg.orderID, buffer + 16, sizeof(msg.orderID));
-            msg.orderID = __builtin_bswap64(msg.orderID);
 
             std::memcpy(&msg.price, buffer + 24, sizeof(msg.price));
-            msg.price = ntohl(msg.price);
 
             std::memcpy(&msg.volume, buffer + 28, sizeof(msg.volume));
-            msg.volume = ntohl(msg.volume);
 
             msg.side = static_cast<char>(buffer[32]);
 
@@ -1165,22 +1093,16 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             NonDisplayedTradeMessage msg;
             
             std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             std::memcpy(&msg.tradeID, buffer + 12, sizeof(msg.tradeID));
-            msg.tradeID = __builtin_bswap64(msg.tradeID);
 
             std::memcpy(&msg.price, buffer + 20, sizeof(msg.price));
-            msg.price = ntohl(msg.price);
 
             std::memcpy(&msg.volume, buffer + 24, sizeof(msg.volume));
-            msg.volume = ntohl(msg.volume);
 
             msg.printableFlag = buffer[28];
 
@@ -1203,22 +1125,16 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             CrossTradeMessage msg;
             
             std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             std::memcpy(&msg.crossID, buffer + 12, sizeof(msg.crossID));
-            msg.crossID = ntohl(msg.crossID);
 
             std::memcpy(&msg.price, buffer + 16, sizeof(msg.price));
-            msg.price = ntohl(msg.price);
 
             std::memcpy(&msg.volume, buffer + 20, sizeof(msg.volume));
-            msg.volume = ntohl(msg.volume);
 
             msg.crossType = static_cast<char>(buffer[24]);
 
@@ -1233,16 +1149,12 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             TradeCancelMessage msg;
             
             std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             std::memcpy(&msg.tradeID, buffer + 12, sizeof(msg.tradeID));
-            msg.tradeID = ntohl(msg.tradeID);
 
             std::cout << "Trade Cancel Message Processed.\n";
             break;
@@ -1255,19 +1167,14 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             CrossCorrectionMessage msg;
 
             std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             std::memcpy(&msg.crossID, buffer + 12, sizeof(msg.crossID));
-            msg.crossID = ntohl(msg.crossID);
 
             std::memcpy(&msg.volume, buffer + 16, sizeof(msg.volume));
-            msg.volume = ntohl(msg.volume);
 
             std::cout << "Cross Correction Message Processed.\n";
             break;
@@ -1280,13 +1187,10 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
             RetailPriceImprovementMessage msg;
 
             std::memcpy(&msg.sourceTimeNS, buffer, sizeof(msg.sourceTimeNS));
-            msg.sourceTimeNS = ntohl(msg.sourceTimeNS);
 
             std::memcpy(&msg.symbolIndex, buffer + 4, sizeof(msg.symbolIndex));
-            msg.symbolIndex = ntohl(msg.symbolIndex);
 
             std::memcpy(&msg.symbolSeqNum, buffer + 8, sizeof(msg.symbolSeqNum));
-            msg.symbolSeqNum = ntohl(msg.symbolSeqNum);
 
             msg.rpiIndicator = static_cast<char>(buffer[12]);
 
