@@ -669,7 +669,19 @@ void printAllBars(const std::unordered_map<uint32_t, bar_t>& symbolBars,
                       << "  High: " << bar.high 
                       << "  Low: " << bar.low 
                       << "  Previous Close: " << bar.prev_close
-                      << "  Volume: " << bar.volume << "\n";
+                      << "  Volume: " << bar.volume;
+            
+            float change_percent = (bar.high - bar.prev_close) / bar.prev_close * 100;
+            std::string change_arrow;
+            if (change_percent < 0) {
+                change_arrow = "↓";
+            } else if (change_percent > 0) {
+                change_arrow = "↑";
+            } else {
+                change_arrow = "↕";
+            }
+
+            std::cout << "  Percent Change: " << change_arrow << " " << round(change_percent * 100.0) / 100.0 << "%\n";
             printed = true;
         }
     }
