@@ -12,6 +12,8 @@
 #include <bitset>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
+#include <thread>
 
 #pragma pack(push, 1)
 
@@ -30,6 +32,16 @@ struct Order {
         return orderID == other.orderID;
     }
 };
+
+// Bar Definition
+struct bar_t {
+    double high;
+    double low;
+    double prev_close;
+    uint64_t volume;
+    uint64_t update_count;
+};
+
 
 // Ethernet Header Definition
 struct mac_hdr_t {
@@ -333,6 +345,30 @@ private:
         }
         return topPrices;
     }
+    void recalculateBar(uint32_t symbolIndex, const std::map<uint32_t,
+                        std::list<Order>>& bids, uint8_t priceScaleCode, 
+                        std::unordered_map<uint32_t, bar_t>& symbolBars) const {
+        auto it = symbolBars.find(symbolIndex);
+        if (it == symbolBars.end()) {
+            std::cerr << "No bar found for SymbolIndex " << symbolIndex << "\n";
+            return;
+        }
+
+        auto& bar = it->second;
+        bar.high = std::numeric_limits<double>::lowest();
+        bar.low = std::numeric_limits<double>::max();
+
+        for (const auto& [price, orders] : bids) {
+            double adjustedPrice = static_cast<double>(price) / std::pow(10, priceScaleCode);
+
+            if (adjustedPrice > bar.high) {
+                bar.high = adjustedPrice;
+            }
+            if (adjustedPrice < bar.low) {
+                bar.low = adjustedPrice;
+            }
+        }
+    }
 
 public:
     void clearOrders() {
@@ -343,7 +379,9 @@ public:
     }
     void addOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum, 
                   uint64_t orderID, uint32_t price, uint32_t volume, char side, 
-                  const std::string& firmID, bool& top10Changed) {
+                  const std::string& firmID, bool& top10Changed,
+                  const std::unordered_map<uint32_t, uint8_t>& symbolPriceScaleCodes,
+                  std::unordered_map<uint32_t, bar_t>& symbolBars) {
         Order newOrder(orderID, price, volume, side, firmID);
         auto& bookSide = (side == 'B') ? bids : asks;
 
@@ -359,11 +397,32 @@ public:
             top10Asks = newTopAsks;
         }
 
+        if (side == 'B') {
+            auto barIt = symbolBars.find(symbolIndex);
+            if (barIt != symbolBars.end()) {
+                auto& bar = barIt->second;
+
+                double adjustedPrice = static_cast<double>(price) / std::pow(10, symbolPriceScaleCodes.at(symbolIndex));
+
+                if (adjustedPrice > bar.high) {
+                    bar.high = adjustedPrice;
+                }
+                if (adjustedPrice < bar.low) {
+                    bar.low = adjustedPrice;
+                }
+                bar.volume += volume;
+
+                bar.update_count++;
+            }
+        }
+
         std::cout << "Added Order: " << orderID << "\n";
     }
     void modifyOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum,
                      uint64_t orderID, uint32_t price, uint32_t volume,
-                     uint8_t positionChange, char side, bool& top10Changed) {
+                     uint8_t positionChange, char side, bool& top10Changed,
+                     const std::unordered_map<uint32_t, uint8_t>& symbolPriceScaleCodes,
+                     std::unordered_map<uint32_t, bar_t>& symbolBars) {
         auto it = orderMap.find(orderID);
         
         if (it != orderMap.end()) {
@@ -371,9 +430,41 @@ public:
 
             std::cout << "Modifying Order: " << order->orderID << "\n";
 
+            bool wasBid = (order->side == 'B');
+            bool isBid = (side == 'B');
+
+            bool recalculate;
+            if (wasBid) {
+                auto barIt = symbolBars.find(symbolIndex);
+                if (barIt != symbolBars.end()) {
+                    auto& bar = barIt->second;
+                    double adjustedPrice = static_cast<double>(order->price) / std::pow(10, symbolPriceScaleCodes.at(symbolIndex));
+            
+                    if (adjustedPrice == bar.high || adjustedPrice == bar.low) {
+                        recalculate = true;
+                    }
+                    bar.volume -= order->volume;
+                    bar.update_count++;
+                }
+            }
+
             order->price = price;
             order->volume = volume;
             order->side = side;
+
+            if (isBid) {
+                auto barIt = symbolBars.find(symbolIndex);
+                if (barIt != symbolBars.end()) {
+                    auto& bar = barIt->second;
+                    double adjustedPrice = static_cast<double>(price) / std::pow(10, symbolPriceScaleCodes.at(symbolIndex));
+
+                    if (recalculate) {
+                        recalculateBar(symbolIndex, bids, symbolPriceScaleCodes.at(symbolIndex), symbolBars);
+                    }
+                    bar.volume += volume;
+                    bar.update_count++;
+                }
+            }
 
             const auto& newTopBids = getTopPrices(bids, true);
             const auto& newTopAsks = getTopPrices(asks);
@@ -446,18 +537,39 @@ public:
     }
     void replaceOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum, 
                   uint64_t oldOrderID, uint64_t newOrderID, uint32_t price, 
-                  uint32_t volume, char side, bool& top10Changed) {
-        deleteOrder(sourceTimeNS, symbolIndex, symbolSeqNum, oldOrderID, top10Changed);
+                  uint32_t volume, char side, bool& top10Changed,
+                  const std::unordered_map<uint32_t, uint8_t>& symbolPriceScaleCodes,
+                  std::unordered_map<uint32_t, bar_t>& symbolBars) {
+        deleteOrder(sourceTimeNS, symbolIndex, symbolSeqNum, oldOrderID, top10Changed, symbolPriceScaleCodes, symbolBars);
 
-        addOrder(sourceTimeNS, symbolIndex, symbolSeqNum, newOrderID, price, volume, side, "", top10Changed);
+        addOrder(sourceTimeNS, symbolIndex, symbolSeqNum, newOrderID, price, volume, side, "", top10Changed, symbolPriceScaleCodes, symbolBars);
     }
     void deleteOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum, 
-                     uint64_t orderID, bool& top10Changed) {
+                     uint64_t orderID, bool& top10Changed,
+                     const std::unordered_map<uint32_t, uint8_t>& symbolPriceScaleCodes,
+                     std::unordered_map<uint32_t, bar_t>& symbolBars) {
         auto it = orderMap.find(orderID);
         
         if (it != orderMap.end()) {
             Order* order = it->second;
             auto& bookSide = (order->side == 'B') ? bids : asks;
+
+            bool recalculate;
+            if (order->side == 'B') {
+                auto barIt = symbolBars.find(symbolIndex);
+                if (barIt != symbolBars.end()) {
+                    auto& bar = barIt->second;
+
+                    bar.volume -= order->volume;
+
+                    uint8_t priceScaleCode = symbolPriceScaleCodes.at(symbolIndex);
+                    double adjustedPrice = static_cast<double>(order->price) / std::pow(10, priceScaleCode);
+
+                    if (adjustedPrice == bar.high || adjustedPrice == bar.low) {
+                        bool recalculate = true;
+                    }
+                }
+            }
 
             auto levelIt = bookSide.find(order->price);
             if (levelIt != bookSide.end()) {
@@ -480,6 +592,11 @@ public:
             }
 
             orderMap.erase(it);
+
+            if (recalculate) {
+                uint8_t priceScaleCode = symbolPriceScaleCodes.at(symbolIndex);
+                recalculateBar(symbolIndex, bids, priceScaleCode, symbolBars);
+            }
 
             const auto& newTopBids = getTopPrices(bids, true);
             const auto& newTopAsks = getTopPrices(asks);
@@ -531,11 +648,36 @@ public:
     }
 };
 
-// Global map of SymbolIndex to OrderBook
+// Global variables
 std::unordered_map<uint32_t, OrderBook> symbolOrderBooks;
 uint32_t currentSymbolIndex = 0;
 std::unordered_map<uint32_t, std::string> symbolMappings;
 std::unordered_map<uint32_t, uint8_t> symbolPriceScaleCodes;
+std::unordered_map<uint32_t, bar_t> symbolBars;
+
+// Print All Bars Function
+void printAllBars(const std::unordered_map<uint32_t, bar_t>& symbolBars, 
+                  const std::unordered_map<uint32_t, std::string>& symbolMappings) {
+    bool printed = false;
+    std::cout << "--------------------------------------\n";
+    for (const auto& [symbolIndex, bar] : symbolBars) {
+        if (bar.update_count > 0) {
+            auto symbolIt = symbolMappings.find(symbolIndex);
+            std::string symbolName = (symbolIt != symbolMappings.end()) ? symbolIt->second : "Unknown";
+
+            std::cout << "Symbol: " << symbolName 
+                      << "  High: " << bar.high 
+                      << "  Low: " << bar.low 
+                      << "  Previous Close: " << bar.prev_close
+                      << "  Volume: " << bar.volume << "\n";
+            printed = true;
+        }
+    }
+    if (!printed) {
+        std::cout << "No bars with updates to print.\n";
+    }
+    std::cout << "--------------------------------------\n";
+}
 
 // Symbol Clear Order Function
 void symbolClear(uint32_t symbolIndex, 
@@ -563,11 +705,11 @@ void addOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeqNum
     if (symbolChanged) {
         currentSymbolIndex = symbolIndex;
     }
-    
+
     auto& orderBook = symbolOrderBooks[symbolIndex];
 
     bool top10Changed = false;
-    orderBook.addOrder(sourceTimeNS, symbolIndex, symbolSeqNum, orderID, price, volume, side, firmID, top10Changed);
+    orderBook.addOrder(sourceTimeNS, symbolIndex, symbolSeqNum, orderID, price, volume, side, firmID, top10Changed, symbolPriceScaleCodes, symbolBars);
 
     if (symbolChanged || top10Changed) {
         orderBook.printOrderBook(symbolIndex, symbolMappings, symbolPriceScaleCodes);
@@ -586,7 +728,7 @@ void modifyOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeq
     auto& orderBook = symbolOrderBooks[symbolIndex];
 
     bool top10Changed = false;
-    orderBook.modifyOrder(sourceTimeNS, symbolIndex, symbolSeqNum, orderID, price, volume, positionChange, side, top10Changed);
+    orderBook.modifyOrder(sourceTimeNS, symbolIndex, symbolSeqNum, orderID, price, volume, positionChange, side, top10Changed, symbolPriceScaleCodes, symbolBars);
 
     if (symbolChanged || top10Changed) {
         orderBook.printOrderBook(symbolIndex, symbolMappings, symbolPriceScaleCodes);
@@ -628,7 +770,7 @@ void replaceOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSe
     auto& orderBook = symbolOrderBooks[symbolIndex];
 
     bool top10Changed = false;
-    orderBook.replaceOrder(sourceTimeNS, symbolIndex, symbolSeqNum, oldOrderID, newOrderID, price, volume, side, top10Changed);
+    orderBook.replaceOrder(sourceTimeNS, symbolIndex, symbolSeqNum, oldOrderID, newOrderID, price, volume, side, top10Changed, symbolPriceScaleCodes, symbolBars);
 
     if (symbolChanged || top10Changed) {
         orderBook.printOrderBook(symbolIndex, symbolMappings, symbolPriceScaleCodes);
@@ -645,7 +787,7 @@ void deleteOrder(uint32_t sourceTimeNS, uint32_t symbolIndex, uint32_t symbolSeq
     auto& orderBook = symbolOrderBooks[symbolIndex];
 
     bool top10Changed = false;
-    orderBook.deleteOrder(sourceTimeNS, symbolIndex, symbolSeqNum, orderID, top10Changed);
+    orderBook.deleteOrder(sourceTimeNS, symbolIndex, symbolSeqNum, orderID, top10Changed, symbolPriceScaleCodes, symbolBars);
 
     if (symbolChanged || top10Changed) {
         orderBook.printOrderBook(symbolIndex, symbolMappings, symbolPriceScaleCodes);
@@ -790,11 +932,18 @@ void handleMessage(uint16_t messageType, const uint8_t* buffer, size_t size) {
 
             std::memcpy(&msg.reserved2, buffer + 38, sizeof(msg.reserved2));
 
-            // Check if the symbolIndex exists, if not add it
+            // Check if the symbolIndex exists in the bar map, and add it if it doesn't
+            if (symbolBars.find(msg.symbolIndex) == symbolBars.end()) {
+                bar_t newBar = {0.0, std::numeric_limits<double>::max(), 0.0, 0, 0};
+                newBar.prev_close = static_cast<double>(msg.prevClosePrice) / std::pow(10, msg.priceScaleCode);
+                symbolBars[msg.symbolIndex] = newBar;
+            }
+
+            // Update symbol mappings and price scale codes
             if (symbolMappings.find(msg.symbolIndex) == symbolMappings.end()) {
                 symbolMappings[msg.symbolIndex] = msg.symbol;
             }
-            symbolPriceScaleCodes[msg.symbolIndex] = msg.priceScaleCode; 
+            symbolPriceScaleCodes[msg.symbolIndex] = msg.priceScaleCode;
 
             std::cout << "Symbol Index Mapping Message Processed.\n";
             break;
@@ -1273,6 +1422,10 @@ int main(int argc, char* argv[]) {
     struct pcap_pkthdr* packet_header;
     const u_char* packet_data;
 
+    extern std::unordered_map<uint32_t, bar_t> symbolBars;
+    const int printIntervalSeconds = 5;
+    auto lastPrintTime = std::chrono::steady_clock::now();
+    
     // Loop through packets
     while (pcap_next_ex(handle, &packet_header, &packet_data) > 0) {
         // Parse Ethernet Header
@@ -1326,6 +1479,15 @@ int main(int argc, char* argv[]) {
         const uint8_t* pillarData = packet_data + udpPayloadOffset;
         uint16_t pillarLength = udpPayloadLength;
         parsePillarStream(pillarData, pillarLength);
+
+        auto currentTime = std::chrono::steady_clock::now();
+        auto elapsedTime = std::chrono::duration_cast<std::chrono::seconds>(currentTime - lastPrintTime);
+
+        if (elapsedTime.count() >= printIntervalSeconds) {
+            std::cout << "Printing bars at " << elapsedTime.count() << " seconds.\n";
+            printAllBars(symbolBars, symbolMappings);
+            lastPrintTime = currentTime;
+        }
     }
 
     pcap_close(handle);
